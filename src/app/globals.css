@@ -1,0 +1,296 @@
+@import "tailwindcss";
+
+/* ============================================================
+   CITY RECEPCIÓN - Design System (Tailwind v4 compatible)
+   ============================================================ */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #020817;
+    color: #f1f5f9;
+    min-height: 100dvh;
+    font-family: var(--font-inter), system-ui, sans-serif;
+  }
+
+  :focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0f172a;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+  }
+}
+
+@layer utilities {
+  /* Glass effect */
+  .glass {
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  }
+
+  /* Cards */
+  .card-base {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 0.75rem;
+  }
+
+  .card-elevated {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 0.75rem;
+  }
+
+  /* Status badges */
+  .badge-pending {
+    background: #1e293b;
+    color: #94a3b8;
+    border: 1px solid #334155;
+  }
+  .badge-partial {
+    background: rgba(120, 53, 15, 0.4);
+    color: #fcd34d;
+    border: 1px solid rgba(146, 64, 14, 0.5);
+  }
+  .badge-complete {
+    background: rgba(5, 46, 22, 0.5);
+    color: #6ee7b7;
+    border: 1px solid rgba(6, 78, 59, 0.5);
+  }
+  .badge-excess {
+    background: rgba(59, 7, 100, 0.5);
+    color: #d8b4fe;
+    border: 1px solid rgba(88, 28, 135, 0.5);
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    height: 8px;
+    border-radius: 9999px;
+    background: #1e293b;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, #2563eb, #059669);
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .progress-bar-fill.excess {
+    background: linear-gradient(90deg, #7c3aed, #dc2626);
+  }
+
+  /* Base para botones grandes de almacén */
+  .btn-warehouse {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 0.875rem 1.5rem;
+    border-radius: 0.75rem;
+    transition: all 0.2s;
+    cursor: pointer;
+    user-select: none;
+    text-decoration: none;
+  }
+
+  .btn-warehouse:active {
+    transform: scale(0.95);
+  }
+
+  .btn-warehouse:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-warehouse:disabled:active {
+    transform: none;
+  }
+
+  .btn-primary {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 0.875rem 1.5rem;
+    border-radius: 0.75rem;
+    transition: all 0.2s;
+    cursor: pointer;
+    user-select: none;
+    text-decoration: none;
+    background: #2563eb;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 20px rgba(37, 99, 235, 0.3);
+  }
+
+  .btn-primary:hover {
+    background: #3b82f6;
+    box-shadow: 0 4px 24px rgba(59, 130, 246, 0.4);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.95);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-success {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 0.875rem 1.5rem;
+    border-radius: 0.75rem;
+    transition: all 0.2s;
+    cursor: pointer;
+    background: #065f46;
+    color: #ffffff;
+    border: none;
+  }
+
+  .btn-success:hover {
+    background: #047857;
+  }
+
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 0.875rem 1.5rem;
+    border-radius: 0.75rem;
+    transition: all 0.2s;
+    cursor: pointer;
+    background: #7f1d1d;
+    color: #ffffff;
+    border: none;
+  }
+
+  .btn-danger:hover {
+    background: #991b1b;
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 0.875rem 1.5rem;
+    border-radius: 0.75rem;
+    transition: all 0.2s;
+    cursor: pointer;
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    text-decoration: none;
+  }
+
+  .btn-ghost:hover {
+    background: #334155;
+  }
+
+  .btn-ghost:active {
+    transform: scale(0.95);
+  }
+
+  /* Input de búsqueda grande */
+  .input-search {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    font-size: 1.125rem;
+    color: #f1f5f9;
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  .input-search::placeholder {
+    color: #475569;
+  }
+
+  .input-search:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
+  }
+
+  /* Animations */
+  .slide-up {
+    animation: slide-up 0.25s ease-out;
+  }
+
+  @keyframes slide-up {
+    from {
+      transform: translateY(8px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .fade-in {
+    animation: fade-in 0.2s ease-out;
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .pulse-subtle {
+    animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+}
