@@ -34,7 +34,10 @@ export async function logoutAction() {
   redirect('/login');
 }
 
-export async function getCurrentUser() {
+import type { Profile } from '@/types';
+import type { User } from '@supabase/supabase-js';
+
+export async function getCurrentUser(): Promise<{ user: User; profile: Profile | null } | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -42,11 +45,11 @@ export async function getCurrentUser() {
 
   if (!user) return null;
 
-  const { data: profile } = await supabase
+  const { data: profile } = (await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .single()) as { data: Profile | null };
 
-  return { user, profile };
+  return { user, profile: profile ?? null };
 }

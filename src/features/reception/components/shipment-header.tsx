@@ -6,13 +6,15 @@ import { ArrowLeft, Truck, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import type { Shipment, ShipmentStats } from '@/types';
 import { formatDate, calcProgress, formatPercent } from '@/lib/utils';
+import ShipmentReportButtons from './shipment-report-buttons';
 
 interface ShipmentHeaderProps {
   shipment: Shipment;
   stats: ShipmentStats | null;
+  isAdmin?: boolean;
 }
 
-export default function ShipmentHeader({ shipment, stats }: ShipmentHeaderProps) {
+export default function ShipmentHeader({ shipment, stats, isAdmin }: ShipmentHeaderProps) {
   const received = stats?.total_received ?? shipment.total_received_boxes;
   const expected = stats?.total_expected ?? shipment.total_expected_boxes;
   const progress = calcProgress(received, expected);
@@ -134,6 +136,18 @@ export default function ShipmentHeader({ shipment, stats }: ShipmentHeaderProps)
             <span className="font-medium">Recepción completada</span>
           </div>
         )}
+
+        {/* Acciones de reportes y cierre */}
+        <div className="mt-4">
+          <ShipmentReportButtons
+            shipmentId={shipment.id}
+            shipmentNumber={shipment.shipment_number}
+            destination={shipment.destination}
+            status={shipment.status}
+            isAdmin={!!isAdmin}
+            variant="full"
+          />
+        </div>
       </div>
     </div>
   );

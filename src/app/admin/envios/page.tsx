@@ -13,6 +13,7 @@ import {
   Edit,
 } from 'lucide-react';
 import { getAllShipments } from '@/features/shipments/actions';
+import ShipmentReportButtons from '@/features/reception/components/shipment-report-buttons';
 import {
   formatDate,
   calcProgress,
@@ -51,11 +52,11 @@ function ShipmentRow({ shipment }: { shipment: Shipment }) {
   const status = shipment.status as ShipmentStatus;
 
   return (
-    <Link
-      href={`/recepcion/${shipment.id}`}
-      className="block card-base p-4 hover:border-slate-600 transition-all group"
-    >
-      <div className="flex items-center gap-4">
+    <div className="card-base p-4 hover:border-slate-700 transition-all flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+      <Link
+        href={`/recepcion/${shipment.id}`}
+        className="flex items-center gap-4 flex-1 min-w-0 group"
+      >
         {/* Status icon */}
         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center">
           {statusIcons[status]}
@@ -76,14 +77,16 @@ function ShipmentRow({ shipment }: { shipment: Shipment }) {
               {getShipmentStatusLabel(status)}
             </span>
           </div>
-          <p className="font-semibold text-white truncate">{shipment.destination}</p>
+          <p className="font-semibold text-white truncate group-hover:text-blue-300 transition-colors">
+            {shipment.destination}
+          </p>
           <p className="text-xs text-slate-400 mt-0.5">
             {formatDate(shipment.shipment_date)}
           </p>
         </div>
 
         {/* Progress */}
-        <div className="flex-shrink-0 text-right hidden sm:block">
+        <div className="flex-shrink-0 text-right hidden md:block">
           <p className="text-sm font-bold text-white tabular-nums">
             {shipment.total_received_boxes} / {shipment.total_expected_boxes}
           </p>
@@ -103,13 +106,28 @@ function ShipmentRow({ shipment }: { shipment: Shipment }) {
             />
           </div>
         </div>
+      </Link>
 
-        <ChevronRight
-          className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-colors flex-shrink-0"
-          aria-hidden="true"
+      {/* Acciones para el envío (PDF, Excel, Finalizar) */}
+      <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800 flex-shrink-0">
+        <ShipmentReportButtons
+          shipmentId={shipment.id}
+          shipmentNumber={shipment.shipment_number}
+          destination={shipment.destination}
+          status={shipment.status}
+          isAdmin={true}
+          variant="compact"
         />
+
+        <Link
+          href={`/recepcion/${shipment.id}`}
+          className="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+          title="Ver recepción"
+        >
+          <ChevronRight className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+        </Link>
       </div>
-    </Link>
+    </div>
   );
 }
 

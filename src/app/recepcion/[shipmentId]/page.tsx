@@ -6,6 +6,7 @@ import { connection } from 'next/server';
 import type { Metadata } from 'next';
 import { getShipmentById, getShipmentItems } from '@/features/shipments/actions';
 import { getShipmentStats } from '@/features/reception/actions';
+import { getCurrentUser } from '@/features/auth/actions';
 import ShipmentReceptionClient from '@/features/reception/components/shipment-reception-client';
 import ShipmentHeader from '@/features/reception/components/shipment-header';
 
@@ -29,19 +30,22 @@ export default async function ShipmentReceptionPage({ params }: PageProps) {
   await connection();
   const { shipmentId } = await params;
 
-  const [shipment, items, stats] = await Promise.all([
+  const [shipment, items, stats, authData] = await Promise.all([
     getShipmentById(shipmentId),
     getShipmentItems(shipmentId),
     getShipmentStats(shipmentId),
+    getCurrentUser(),
   ]);
 
   if (!shipment) {
     notFound();
   }
 
+  const isAdmin = authData?.profile?.role === 'admin';
+
   return (
     <div className="space-y-4">
-      <ShipmentHeader shipment={shipment} stats={stats} />
+      <ShipmentHeader shipment={shipment} stats={stats} isAdmin={isAdmin} />
       <ShipmentReceptionClient
         shipment={shipment}
         initialItems={items}
