@@ -176,11 +176,10 @@ export default function ShipmentReceptionClient({
         <Link
           href={`/recepcion/${shipment.id}/rapida`}
           id="btn-quick-reception"
-          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:border-slate-600 transition-all text-sm font-medium"
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 text-amber-300 hover:bg-slate-800 hover:border-amber-400/70 transition-all text-sm font-semibold shadow-sm"
         >
-          <Zap className="w-4 h-4 text-amber-400" aria-hidden="true" />
+          <Zap className="w-4 h-4 text-amber-400 fill-amber-400" aria-hidden="true" />
           MODO RECEPCIÓN RÁPIDA
-          <span className="text-xs text-slate-500 ml-1">(Próx. FASE 2)</span>
         </Link>
         <CameraScanner shipmentId={shipment.id} items={items} onUpdate={handleItemUpdate} onSelect={setSelectedId} />
       </div>

@@ -5,6 +5,7 @@ import type { AttendanceSettings } from "../types";
 import MutationForm from "./mutation-form";
 import { saveAttendanceSettings } from "../actions";
 import type { LucideIcon } from "lucide-react";
+import DangerZone from "./danger-zone";
 export function AttendanceSettingsCard({
   title,
   value,
@@ -107,6 +108,8 @@ export default function Settings({
           </MutationForm>
         </div>
       )}
+
+      <DangerZone />
     </section>
   );
 }
