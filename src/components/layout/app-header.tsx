@@ -2,9 +2,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as Menu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, LogOut, Settings } from "lucide-react";
-import { logoutAction } from "@/features/auth/actions";
+import { ChevronDown, Settings } from "lucide-react";
 import CityBrand from "./city-brand";
+import LogoutMenuItem from "./logout-menu-item";
 import { initials } from "@/features/attendance/personnel";
 interface AppHeaderProps {
   userEmail: string;
@@ -141,18 +141,7 @@ export default function AppHeader({
                   </Link>
                 </Menu.Item>
               )}
-              <form action={logoutAction}>
-                <Menu.Item asChild>
-                  <button
-                    type="submit"
-                    id="btn-logout"
-                    className="flex gap-2 w-full p-3 rounded-lg text-sm text-rose-300 outline-none data-[highlighted]:bg-purple-500/20"
-                  >
-                    <LogOut size={16} />
-                    Cerrar sesión
-                  </button>
-                </Menu.Item>
-              </form>
+              <LogoutMenuItem />
             </Menu.Content>
           </Menu.Portal>
         </Menu.Root>
