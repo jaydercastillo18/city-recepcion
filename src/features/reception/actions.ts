@@ -60,13 +60,23 @@ export async function createIncidentAction(input: {
     return { success: false, error: 'No autenticado' };
   }
 
+  const description = input.description.trim();
+  if (!description || description.length > 2000) {
+    return { success: false, error: 'Escribe una observación de 1 a 2000 caracteres.' };
+  }
+  if (input.shipmentItemId) {
+    const { data: item, error } = await supabase.from('shipment_items').select('id')
+      .eq('id', input.shipmentItemId).eq('shipment_id', input.shipmentId).single();
+    if (error || !item) return { success: false, error: 'Producto no encontrado en este envío.' };
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('incidents') as any).insert({
     shipment_id: input.shipmentId,
     shipment_item_id: input.shipmentItemId ?? null,
     user_id: user.id,
     type: input.type,
-    description: input.description,
+    description,
   });
 
   if (error) {

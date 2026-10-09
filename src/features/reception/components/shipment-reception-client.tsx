@@ -4,9 +4,12 @@
 // Maneja búsqueda, filtros y lista de items
 // ============================================================
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { Search, X, Zap, ScanLine } from 'lucide-react';
+import { Search, X, Zap } from 'lucide-react';
 import { searchItems } from '@/lib/search/search';
 import ItemCard from './item-card';
+import CameraScanner from './camera-scanner';
+import ShipmentHeader from './shipment-header';
+import { receptionStats } from '@/lib/reception';
 import type { Shipment, ShipmentItem, SearchFilter, ItemStatus } from '@/types';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -14,10 +17,12 @@ import Link from 'next/link';
 interface ShipmentReceptionClientProps {
   shipment: Shipment;
   initialItems: ShipmentItem[];
+  isAdmin?: boolean;
 }
 
 const FILTERS: { value: SearchFilter; label: string }[] = [
   { value: 'all', label: 'Todos' },
+  { value: 'missing', label: 'Solo faltantes' },
   { value: 'pending', label: 'Pendientes' },
   { value: 'partial', label: 'Parciales' },
   { value: 'complete', label: 'Completos' },
@@ -29,8 +34,10 @@ const DEBOUNCE_MS = 150; // 150ms debounce - rápido para almacén
 export default function ShipmentReceptionClient({
   shipment,
   initialItems,
+  isAdmin,
 }: ShipmentReceptionClientProps) {
   const [items, setItems] = useState<ShipmentItem[]>(initialItems);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<SearchFilter>('all');
@@ -63,6 +70,7 @@ export default function ShipmentReceptionClient({
   // Filtrar por status primero, luego buscar
   const filteredByStatus = useMemo(() => {
     if (activeFilter === 'all') return items;
+    if (activeFilter === 'missing') return items.filter(item => item.expected_boxes - item.received_boxes > 0);
     return items.filter((item) => item.status === (activeFilter as ItemStatus));
   }, [items, activeFilter]);
 
@@ -78,7 +86,7 @@ export default function ShipmentReceptionClient({
 
   // Contador por status para badges en filtros
   const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: items.length };
+    const counts: Record<string, number> = { all: items.length, missing: items.filter(i => i.expected_boxes > i.received_boxes).length };
     for (const item of items) {
       counts[item.status] = (counts[item.status] ?? 0) + 1;
     }
@@ -87,6 +95,7 @@ export default function ShipmentReceptionClient({
 
   return (
     <div className="space-y-4">
+      <ShipmentHeader shipment={shipment} stats={receptionStats(items)} isAdmin={isAdmin} />
       {/* Buscador principal */}
       <div className="card-base p-4 space-y-3">
         <div className="relative">
@@ -136,7 +145,7 @@ export default function ShipmentReceptionClient({
                 id={`btn-filter-${filter.value}`}
                 onClick={() => setActiveFilter(filter.value)}
                 className={cn(
-                  'flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150',
+                  'flex-shrink-0 flex items-center gap-1.5 px-3 py-3 min-h-12 rounded-lg text-sm font-medium transition-all duration-150',
                   activeFilter === filter.value
                     ? 'bg-blue-600 text-white shadow-sm shadow-blue-900/30'
                     : 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700 border border-slate-700'
@@ -163,7 +172,7 @@ export default function ShipmentReceptionClient({
       </div>
 
       {/* Botón modo recepción rápida */}
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <Link
           href={`/recepcion/${shipment.id}/rapida`}
           id="btn-quick-reception"
@@ -173,18 +182,13 @@ export default function ShipmentReceptionClient({
           MODO RECEPCIÓN RÁPIDA
           <span className="text-xs text-slate-500 ml-1">(Próx. FASE 2)</span>
         </Link>
-        <button
-          id="btn-scan-mode"
-          className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 transition-all text-sm font-medium opacity-50 cursor-not-allowed"
-          disabled
-          title="Disponible en FASE 2"
-          aria-disabled="true"
-        >
-          <ScanLine className="w-4 h-4 text-blue-400" aria-hidden="true" />
-          <span className="hidden sm:inline">ESCANEAR</span>
-        </button>
+        <CameraScanner shipmentId={shipment.id} items={items} onUpdate={handleItemUpdate} onSelect={setSelectedId} />
       </div>
 
+      {selectedId && items.some(i => i.id === selectedId) && <section className="space-y-2" aria-label="Producto escaneado">
+        <div className="flex justify-between items-center"><h2 className="text-fuchsia-200 font-semibold">Producto escaneado</h2><button className="btn-ghost p-2" onClick={() => setSelectedId(null)} aria-label="Cerrar producto escaneado"><X className="w-4 h-4" /></button></div>
+        <ItemCard item={items.find(i => i.id === selectedId)!} shipmentId={shipment.id} onUpdate={handleItemUpdate} />
+      </section>}
       {/* Resultados */}
       <div>
         {/* Contador de resultados */}
@@ -230,7 +234,7 @@ export default function ShipmentReceptionClient({
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-1 lg:grid-cols-2">
-            {displayedItems.map((item) => (
+            {displayedItems.filter(item => item.id !== selectedId).map((item) => (
               <ItemCard
                 key={item.id}
                 item={item}

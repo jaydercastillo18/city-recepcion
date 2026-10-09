@@ -176,7 +176,19 @@ npm run build
 ---
 
 ## 🗺️ 8. Roadmap: FASE 2 y Siguientes
-- [ ] Escaneo con cámara del teléfono (código de barras / QR) con feedback sonoro tipo *beep* de terminal Honeywell / Zebra.
-- [ ] Importador masivo de archivos Excel/CSV para creación automática de envíos e ítems.
+- [x] Escaneo con cámara del teléfono, lectura de barras/texto, registro +1 y entrada manual.
+- [x] Importador Excel/CSV con vista previa, auditoría e importación atómica de envíos independientes (requiere aplicar la nueva migración).
 - [ ] Módulo de fotos de incidencias almacenadas en Supabase Storage.
 - [ ] Modo offline con sincronización en segundo plano (PWA).
+
+
+## Recepción de almacén · City Ofertas
+Consulta [la guía de uso y cambios](docs/recepcion-almacen.md) para escaneo, faltantes, observaciones, reportes y validación.
+
+Consulta [la guía de importación Excel](docs/importacion-excel.md) para el SQL pendiente de revisión, la arquitectura y el flujo de subida de archivos reales.
+
+Consulta [cierre y eliminación administrativa](docs/cierre-y-eliminacion.md) para el SQL nuevo, cierre con faltantes y borrado con confirmación fuerte.
+
+## Control de asistencia
+
+El módulo integrado, su SQL nuevo, configuración y prueba con dos empleados están documentados en [Control de asistencia](docs/control-de-asistencia.md). La migración se aplica manualmente en el Supabase existente.

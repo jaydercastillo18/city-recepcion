@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/types/database';
 
 // Rutas que requieren autenticación
-const PROTECTED_ROUTES = ['/recepcion', '/admin'];
+const PROTECTED_ROUTES = ['/recepcion', '/admin', '/asistencia'];
 
 // Rutas solo para admin
 const ADMIN_ROUTES = ['/admin'];
@@ -62,7 +62,7 @@ export async function middleware(request: NextRequest) {
   // Si ya autenticado y va a /login → redirigir a /recepcion
   if (pathname === '/login' && user) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/recepcion';
+    redirectUrl.pathname = '/';
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -76,11 +76,17 @@ export async function middleware(request: NextRequest) {
 
     if (profile?.role !== 'admin') {
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = '/recepcion';
+      redirectUrl.pathname = profile?.role === 'employee' ? '/asistencia' : '/recepcion';
       return NextResponse.redirect(redirectUrl);
     }
   }
 
+  if (user && (pathname.startsWith('/recepcion') || pathname.startsWith('/asistencia'))) {
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id',user.id).single();
+    if ((pathname.startsWith('/recepcion') && profile?.role==='employee') || (pathname.startsWith('/asistencia') && profile?.role==='warehouse')) {
+      const url=request.nextUrl.clone();url.pathname=profile?.role==='employee'?'/asistencia':'/recepcion';url.search='';return NextResponse.redirect(url);
+    }
+  }
   return supabaseResponse;
 }
 

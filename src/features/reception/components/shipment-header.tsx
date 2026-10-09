@@ -18,7 +18,7 @@ export default function ShipmentHeader({ shipment, stats, isAdmin }: ShipmentHea
   const received = stats?.total_received ?? shipment.total_received_boxes;
   const expected = stats?.total_expected ?? shipment.total_expected_boxes;
   const progress = calcProgress(received, expected);
-  const missing = Math.max(0, expected - received);
+  const missing = stats?.boxes_missing ?? Math.max(0, expected - received);
 
   return (
     <div className="card-base overflow-hidden">
@@ -29,7 +29,7 @@ export default function ShipmentHeader({ shipment, stats, isAdmin }: ShipmentHea
           background:
             progress >= 100
               ? 'linear-gradient(90deg, hsl(142 76% 36%), hsl(142 76% 50%))'
-              : 'linear-gradient(90deg, hsl(217 91% 50%), hsl(142 76% 45%))',
+              : 'linear-gradient(90deg, hsl(275 75% 50%), hsl(325 85% 55%))',
         }}
         aria-hidden="true"
       />
@@ -124,13 +124,13 @@ export default function ShipmentHeader({ shipment, stats, isAdmin }: ShipmentHea
         )}
 
         {/* Faltante alert */}
-        {missing > 0 && progress < 100 && (
+        {missing > 0 && (
           <div className="mt-3 px-3 py-2 rounded-lg bg-amber-950/40 border border-amber-800/50 text-amber-300 text-sm flex items-center justify-between">
             <span>Faltan por recibir:</span>
             <span className="font-bold tabular-nums">{missing} cajas</span>
           </div>
         )}
-        {progress >= 100 && (
+        {missing === 0 && expected > 0 && (
           <div className="mt-3 px-3 py-2 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-emerald-300 text-sm flex items-center gap-2">
             <span>✅</span>
             <span className="font-medium">Recepción completada</span>
@@ -139,11 +139,12 @@ export default function ShipmentHeader({ shipment, stats, isAdmin }: ShipmentHea
 
         {/* Acciones de reportes y cierre */}
         <div className="mt-4">
-          <ShipmentReportButtons
+        <ShipmentReportButtons
             shipmentId={shipment.id}
             shipmentNumber={shipment.shipment_number}
             destination={shipment.destination}
             status={shipment.status}
+            finalizedWithShortage={shipment.finalized_with_shortage}
             isAdmin={!!isAdmin}
             variant="full"
           />

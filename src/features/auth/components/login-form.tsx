@@ -3,8 +3,9 @@
 // CITY RECEPCIÓN - Formulario de Login
 // ============================================================
 import { useState, useTransition } from 'react';
-import { Package2, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 import { loginAction } from '@/features/auth/actions';
+import CityBrand from '@/components/layout/city-brand';
 import { cn } from '@/lib/utils';
 
 export default function LoginForm() {
@@ -36,15 +37,13 @@ export default function LoginForm() {
     >
       {/* Logo / Header */}
       <div className="flex flex-col items-center gap-3 mb-8">
-        <div className="p-3 rounded-2xl bg-blue-600/20 border border-blue-500/30">
-          <Package2 className="w-10 h-10 text-blue-400" aria-hidden="true" />
-        </div>
+        <CityBrand large />
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white tracking-tight">
-            City Recepción
+            City Ofertas
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Sistema de control de mercadería
+            Control interno · Mercadería y asistencia
           </p>
         </div>
       </div>
@@ -146,7 +145,7 @@ export default function LoginForm() {
 
       {/* Footer */}
       <p className="text-center text-xs text-slate-600 mt-6">
-        Sistema interno · City Recepción v1.0
+        City Ofertas · Recepción de mercadería
       </p>
     </div>
   );

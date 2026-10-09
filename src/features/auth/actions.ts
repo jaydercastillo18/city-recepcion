@@ -25,7 +25,13 @@ export async function loginAction(formData: FormData) {
     return { error: 'Credenciales inválidas. Verifica tu email y contraseña.' };
   }
 
-  redirect(redirectTo ?? '/recepcion');
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = user ? await supabase.from('profiles').select('role').eq('id',user.id).single() : {data:null};
+  const home=profile?.role==='admin'?'/':profile?.role==='employee'?'/asistencia':'/recepcion';
+  const safeRedirect=redirectTo?.startsWith('/') && !redirectTo.startsWith('//') && !redirectTo.includes('\\') && (
+    profile?.role==='admin' || (profile?.role==='employee'?redirectTo.startsWith('/asistencia'):redirectTo.startsWith('/recepcion'))
+  );
+  redirect(safeRedirect ? redirectTo! : home);
 }
 
 export async function logoutAction() {

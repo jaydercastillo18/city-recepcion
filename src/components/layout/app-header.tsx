@@ -6,7 +6,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Package2,
   LogOut,
   Settings,
   ChevronDown,
@@ -14,12 +13,13 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { logoutAction } from '@/features/auth/actions';
+import CityBrand from './city-brand';
 import { cn } from '@/lib/utils';
 
 interface AppHeaderProps {
   userEmail: string;
   userName: string;
-  userRole: 'admin' | 'warehouse';
+  userRole: 'admin' | 'warehouse' | 'employee';
 }
 
 export default function AppHeader({ userName, userRole }: AppHeaderProps) {
@@ -28,8 +28,11 @@ export default function AppHeader({ userName, userRole }: AppHeaderProps) {
 
   const isAdmin = userRole === 'admin';
 
+  const attendance=pathname.includes('asistencia');
   const navLinks = [
-    { href: '/recepcion', label: 'Recepción', active: pathname.startsWith('/recepcion') },
+    ...(isAdmin?[{href:'/',label:'Portal',active:pathname==='/'}]:[]),
+    ...(userRole!=='employee'?[{ href: '/recepcion', label: 'Recepción', active: pathname.startsWith('/recepcion') }]:[]),
+    ...(userRole!=='warehouse'?[{href:isAdmin?'/admin/asistencia':'/asistencia',label:'Asistencia',active:attendance}]:[]),
     ...(isAdmin
       ? [{ href: '/admin', label: 'Administración', active: pathname.startsWith('/admin') }]
       : []),
@@ -40,13 +43,11 @@ export default function AppHeader({ userName, userRole }: AppHeaderProps) {
       <div className="container mx-auto max-w-6xl px-4 h-16 flex items-center justify-between gap-4">
         {/* Logo */}
         <Link
-          href="/recepcion"
+          href={isAdmin?'/' : userRole==='employee'?'/asistencia':'/recepcion'}
           className="flex items-center gap-2.5 font-bold text-lg text-white hover:text-blue-300 transition-colors"
         >
-          <div className="p-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30">
-            <Package2 className="w-5 h-5 text-blue-400" aria-hidden="true" />
-          </div>
-          <span className="hidden sm:inline">City Recepción</span>
+          <CityBrand />
+          <span className="hidden sm:inline text-xs text-slate-300 border-l border-purple-700 pl-3">{attendance?'Control de asistencia':'Control interno'}</span>
         </Link>
 
         {/* Nav */}
@@ -104,6 +105,9 @@ export default function AppHeader({ userName, userRole }: AppHeaderProps) {
                 aria-hidden="true"
               />
               <div className="absolute right-0 top-full mt-2 w-52 card-base shadow-xl shadow-black/50 z-20 overflow-hidden fade-in">
+                <nav className="md:hidden border-b border-slate-800" aria-label="Navegación móvil">
+                  {navLinks.map(link=><Link key={link.href} href={link.href} onClick={()=>setMenuOpen(false)} className="block px-4 py-3 text-sm text-purple-200">{link.label}</Link>)}
+                </nav>
                 <div className="px-4 py-3 border-b border-slate-800">
                   <p className="text-xs text-slate-500">Sesión activa</p>
                   <p className="text-sm font-medium text-slate-200 truncate">{userName}</p>
@@ -111,7 +115,7 @@ export default function AppHeader({ userName, userRole }: AppHeaderProps) {
                     {isAdmin ? (
                       <><ShieldCheck className="w-3 h-3" /> Admin</>
                     ) : (
-                      <><Warehouse className="w-3 h-3" /> Almacén</>
+                      <><Warehouse className="w-3 h-3" /> {userRole==='employee'?'Empleado':'Almacén'}</>
                     )}
                   </span>
                 </div>

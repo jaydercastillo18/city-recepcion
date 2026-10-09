@@ -58,13 +58,6 @@ const statusConfig: Record<
   },
 };
 
-const INCIDENT_PRESETS = [
-  'Caja rota / dañada',
-  'Código de barra ilegible',
-  'Faltante en embalaje',
-  'Producto incorrecto',
-];
-
 export default function ItemCard({ item, shipmentId, onUpdate }: ItemCardProps) {
   const [isPending, startTransition] = useTransition();
   const [showManual, setShowManual] = useState(false);
@@ -176,7 +169,7 @@ export default function ItemCard({ item, shipmentId, onUpdate }: ItemCardProps) 
     if (!incidentNote.trim()) {
       toast({
         title: 'Nota vacía',
-        description: 'Escribe una breve descripción de la incidencia',
+        description: 'Escribe una observación para este producto',
         variant: 'destructive',
       });
       return;
@@ -186,16 +179,17 @@ export default function ItemCard({ item, shipmentId, onUpdate }: ItemCardProps) 
       const result = await createIncidentAction({
         shipmentId,
         shipmentItemId: item.id,
-        type: 'damaged',
+        type: 'other',
         description: incidentNote.trim(),
       });
 
       if (result.success) {
+        onUpdate({ id: item.id, observations: [...(item.observations ?? []), incidentNote.trim()] });
         setIncidentNote('');
         setShowIncident(false);
         toast({
-          title: 'Incidencia guardada',
-          description: 'Quedó registrada en el sistema de incidencias.',
+          title: 'Observación guardada',
+          description: 'Guardada para este producto; aparecerá en PDF y Excel.',
           variant: 'default',
         });
       } else {
@@ -209,7 +203,7 @@ export default function ItemCard({ item, shipmentId, onUpdate }: ItemCardProps) 
   }
 
   return (
-    <article
+    <article id={`item-${item.id}`}
       className={cn(
         'card-base p-4 transition-all duration-200 slide-up',
         status === 'complete' && 'border-emerald-800/50 bg-emerald-950/10',
@@ -436,14 +430,17 @@ export default function ItemCard({ item, shipmentId, onUpdate }: ItemCardProps) 
                 ? 'bg-amber-600/20 border-amber-500 text-amber-300'
                 : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400 hover:text-slate-200'
             )}
-            title="Reportar incidencia o nota"
-            aria-label="Reportar incidencia o nota"
+            title="Agregar observación"
+            aria-label="Agregar observación"
           >
-            <MessageSquareWarning className="w-3.5 h-3.5" aria-hidden="true" />
-          </button>
+            <MessageSquareWarning className="w-3.5 h-3.5 inline mr-1" aria-hidden="true" /> Agregar observación</button>
         </div>
       </div>
 
+      {!!item.observations?.length && <div className="mt-3 p-3 rounded-xl bg-fuchsia-950/30 border border-fuchsia-800/50">
+        <p className="text-sm font-semibold text-fuchsia-200">Con observación ({item.observations.length})</p>
+        {item.observations.map((note, index) => <p key={index} className="text-sm text-slate-200 whitespace-pre-wrap break-words mt-1">{note}</p>)}
+      </div>}
       {/* Panel desplegable: Entrada Manual */}
       {showManual && (
         <div className="mt-3 p-3 rounded-xl bg-slate-900/90 border border-blue-500/30 fade-in">
@@ -487,7 +484,7 @@ export default function ItemCard({ item, shipmentId, onUpdate }: ItemCardProps) 
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-amber-300 flex items-center gap-1">
               <MessageSquareWarning className="w-3.5 h-3.5" />
-              Registrar Incidencia / Observación
+              Agregar observación
             </span>
             <button
               onClick={() => setShowIncident(false)}
@@ -497,26 +494,11 @@ export default function ItemCard({ item, shipmentId, onUpdate }: ItemCardProps) 
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {INCIDENT_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => setIncidentNote(preset)}
-                className="text-[11px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-              >
-                {preset}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={incidentNote}
+          <div className="flex flex-col gap-2">
+            <textarea aria-label="Observación del producto" maxLength={2000} rows={3} value={incidentNote}
               onChange={(e) => setIncidentNote(e.target.value)}
-              placeholder="Detalle de incidencia..."
-              className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+              placeholder="Ej. Caja dañada, embalaje abierto…"
+              className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-base text-white placeholder-slate-400 min-w-0 focus:outline-none focus:border-amber-500"
               autoFocus
             />
             <button
@@ -525,7 +507,7 @@ export default function ItemCard({ item, shipmentId, onUpdate }: ItemCardProps) 
               disabled={isDisabled}
               className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition-colors disabled:opacity-50"
             >
-              Registrar
+              Guardar
             </button>
           </div>
         </div>

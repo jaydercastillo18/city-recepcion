@@ -22,6 +22,7 @@ interface ShipmentReportButtonsProps {
   isAdmin: boolean;
   variant?: 'full' | 'compact';
   onStatusChanged?: () => void;
+  finalizedWithShortage?: boolean;
 }
 
 export default function ShipmentReportButtons({
@@ -32,6 +33,7 @@ export default function ShipmentReportButtons({
   isAdmin,
   variant = 'full',
   onStatusChanged,
+  finalizedWithShortage = false,
 }: ShipmentReportButtonsProps) {
   const [downloading, setDownloading] = useState<'pdf' | 'excel' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -208,7 +210,7 @@ export default function ShipmentReportButtons({
             {isCompleted ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 text-xs sm:text-sm font-semibold">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                Recepción Finalizada
+                {finalizedWithShortage ? 'Finalizado con faltantes' : 'Recepción finalizada'}
               </span>
             ) : (
               <button

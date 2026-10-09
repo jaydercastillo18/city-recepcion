@@ -2,6 +2,7 @@
 // CITY RECEPCIÓN - Página de Login
 // ============================================================
 import type { Metadata } from 'next';
+import WarehouseHero from '@/components/layout/warehouse-hero';
 import LoginForm from '@/features/auth/components/login-form';
 
 export const metadata: Metadata = {
@@ -17,20 +18,20 @@ export default function LoginPage() {
         className="absolute inset-0 -z-10"
         style={{
           background:
-            'radial-gradient(ellipse 80% 60% at 50% -20%, rgba(37,99,235,0.15) 0%, transparent 70%), hsl(222 47% 6%)',
+            'radial-gradient(ellipse 80% 60% at 50% -20%, rgba(168,35,185,0.22) 0%, transparent 70%), hsl(269 50% 7%)',
         }}
         aria-hidden="true"
       />
       <div
         className="absolute top-1/4 left-1/4 -z-10 w-96 h-96 rounded-full opacity-5"
         style={{
-          background: 'radial-gradient(circle, hsl(217 91% 60%), transparent)',
+          background: 'radial-gradient(circle, hsl(310 80% 60%), transparent)',
           filter: 'blur(60px)',
         }}
         aria-hidden="true"
       />
 
-      <LoginForm />
+      <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-6 items-center"><WarehouseHero /><div className="flex justify-center"><LoginForm /></div></div>
     </main>
   );
 }

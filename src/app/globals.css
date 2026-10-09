@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@theme {
+  --color-blue-300: #e9baff;
+  --color-blue-400: #d990fa;
+  --color-blue-500: #b14de3;
+  --color-blue-600: #8b29c4;
+  --color-blue-900: #421666;
+}
+
 /* ============================================================
    CITY RECEPCIÓN - Design System (Tailwind v4 compatible)
    ============================================================ */
@@ -17,14 +25,14 @@
   }
 
   body {
-    background-color: #020817;
+    background-color: #10091c;
     color: #f1f5f9;
     min-height: 100dvh;
     font-family: var(--font-inter), system-ui, sans-serif;
   }
 
   :focus-visible {
-    outline: 2px solid #3b82f6;
+    outline: 2px solid #e879f9;
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -48,7 +56,7 @@
 @layer utilities {
   /* Glass effect */
   .glass {
-    background: rgba(15, 23, 42, 0.75);
+    background: rgba(25, 14, 41, 0.94);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(148, 163, 184, 0.08);
@@ -56,8 +64,8 @@
 
   /* Cards */
   .card-base {
-    background: #0f172a;
-    border: 1px solid #1e293b;
+    background: #1b1329;
+    border: 1px solid #3b2b50;
     border-radius: 0.75rem;
   }
 
@@ -100,7 +108,7 @@
   .progress-bar-fill {
     height: 100%;
     border-radius: 9999px;
-    background: linear-gradient(90deg, #2563eb, #059669);
+    background: linear-gradient(90deg, #8b29c4, #d0268f);
     transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
@@ -152,15 +160,15 @@
     cursor: pointer;
     user-select: none;
     text-decoration: none;
-    background: #2563eb;
+    background: linear-gradient(120deg, #7928b8, #ad2078);
     color: #ffffff;
     border: none;
-    box-shadow: 0 4px 20px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 4px 20px rgba(126, 34, 206, 0.25);
   }
 
   .btn-primary:hover {
-    background: #3b82f6;
-    box-shadow: 0 4px 24px rgba(59, 130, 246, 0.4);
+    background: #922bc0;
+    box-shadow: 0 4px 24px rgba(174, 40, 156, 0.3);
   }
 
   .btn-primary:active {
@@ -252,12 +260,12 @@
   }
 
   .input-search::placeholder {
-    color: #475569;
+    color: #94a3b8;
   }
 
   .input-search:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 1px #3b82f6;
+    border-color: #d990fa;
+    box-shadow: 0 0 0 1px #d990fa;
   }
 
   /* Animations */
@@ -293,4 +301,77 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
   }
+}
+
+.warehouse-hero { background: radial-gradient(circle at 90% 15%, #c02685 0, transparent 50%), linear-gradient(120deg, #4c1d95, #7023a6); border: 1px solid #a855c7; }
+
+.import-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid #654078;
+  border-radius: 12px;
+  background: #10091c;
+  color: #f1f5f9;
+  font-size: 16px;
+  color-scheme: dark;
+}
+.import-input:focus { outline: 2px solid #d990fa; outline-offset: 2px; }
+
+/* Decorative backdrop scoped to the shipment page. Cards keep their solid backgrounds. */
+.shipment-scene { position: relative; isolation: isolate; }
+.shipment-backdrop {
+  position: fixed;
+  inset: 4rem 0 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 12% 65%, #7c28ac20, transparent 60%),
+    radial-gradient(ellipse at 95% 25%, #da278819, transparent 55%);
+}
+.shipment-backdrop__truck {
+  position: absolute;
+  width: clamp(58rem, 92vw, 100rem);
+  aspect-ratio: 1200 / 650;
+  left: calc(50% - 43rem);
+  bottom: -3rem;
+  background: url('/branding/city-ofertas-truck-bg.svg') center / contain no-repeat;
+  opacity: 0.14;
+}
+.shipment-backdrop__logo {
+  position: absolute;
+  top: 8%;
+  right: 3%;
+  width: clamp(13rem, 24vw, 25rem);
+  aspect-ratio: 640 / 361;
+  background: url('/city-ofertas.png') center / contain no-repeat;
+  opacity: 0.045;
+}
+.shipment-backdrop__veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #10091c90, transparent 35%, #10091c30 80%, #10091c80);
+}
+@media (min-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .shipment-backdrop__truck { animation: shipment-truck-drift 24s ease-in-out infinite alternate; }
+}
+@keyframes shipment-truck-drift {
+  from { transform: translate3d(-6px, 0, 0); }
+  to { transform: translate3d(6px, -4px, 0); }
+}
+@media (max-width: 767px) {
+  .shipment-backdrop__truck { width: 58rem; left: calc(50% - 44rem); bottom: 4%; opacity: 0.09; }
+  .shipment-backdrop__logo { width: 15rem; right: -3rem; top: 6%; opacity: 0.025; }
+}
+@layer base {
+  button, a.btn-primary, a.btn-ghost { min-height: 44px; }
+  input, textarea { font-size: 16px; }
+  button:disabled { cursor: not-allowed; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }

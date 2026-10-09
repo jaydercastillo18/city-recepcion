@@ -5,10 +5,9 @@ import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 import type { Metadata } from 'next';
 import { getShipmentById, getShipmentItems } from '@/features/shipments/actions';
-import { getShipmentStats } from '@/features/reception/actions';
 import { getCurrentUser } from '@/features/auth/actions';
 import ShipmentReceptionClient from '@/features/reception/components/shipment-reception-client';
-import ShipmentHeader from '@/features/reception/components/shipment-header';
+import ShipmentBackdrop from '@/components/layout/shipment-backdrop';
 
 interface PageProps {
   params: Promise<{ shipmentId: string }>;
@@ -30,10 +29,9 @@ export default async function ShipmentReceptionPage({ params }: PageProps) {
   await connection();
   const { shipmentId } = await params;
 
-  const [shipment, items, stats, authData] = await Promise.all([
+  const [shipment, items, authData] = await Promise.all([
     getShipmentById(shipmentId),
     getShipmentItems(shipmentId),
-    getShipmentStats(shipmentId),
     getCurrentUser(),
   ]);
 
@@ -44,11 +42,12 @@ export default async function ShipmentReceptionPage({ params }: PageProps) {
   const isAdmin = authData?.profile?.role === 'admin';
 
   return (
-    <div className="space-y-4">
-      <ShipmentHeader shipment={shipment} stats={stats} isAdmin={isAdmin} />
+    <div className="shipment-scene space-y-4">
+      <ShipmentBackdrop />
       <ShipmentReceptionClient
         shipment={shipment}
         initialItems={items}
+        isAdmin={isAdmin}
       />
     </div>
   );

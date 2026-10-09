@@ -9,7 +9,7 @@ export type UUID = string;
 
 export type ItemStatus = 'pending' | 'partial' | 'complete' | 'excess';
 export type ShipmentStatus = 'draft' | 'receiving' | 'completed' | 'cancelled';
-export type UserRole = 'admin' | 'warehouse';
+export type UserRole = 'admin' | 'warehouse' | 'employee';
 export type ReceptionAction = 'receive' | 'correction' | 'reset';
 export type IncidentType = 'missing' | 'extra' | 'damaged' | 'wrong_product' | 'other';
 
@@ -24,6 +24,19 @@ export interface Profile {
 }
 
 export interface Shipment {
+  finalized_at?: string | null;
+  finalized_by?: UUID | null;
+  finalized_by_name?: string | null;
+  finalized_with_shortage?: boolean;
+  finalization_notes?: string | null;
+  missing_boxes_at_finalization?: number;
+  source_file_name?: string | null;
+  source_file_sha256?: string | null;
+  imported_at?: string | null;
+  imported_by?: string | null;
+  import_rows?: number | null;
+  import_warnings?: unknown;
+  import_request_id?: string | null;
   id: UUID;
   shipment_number: string;
   destination: string;
@@ -37,6 +50,7 @@ export interface Shipment {
 }
 
 export interface ShipmentItem {
+  observations?: string[]; // UI projection of existing incidents, never a database column.
   id: UUID;
   shipment_id: UUID;
   supplier: string | null;
@@ -105,7 +119,7 @@ export interface ShipmentStats {
 // ----------------------------------------------------------------
 // Tipos para UI / búsqueda
 // ----------------------------------------------------------------
-export type SearchFilter = 'all' | ItemStatus;
+export type SearchFilter = 'all' | 'missing' | ItemStatus;
 
 export interface SearchResult extends ShipmentItem {
   matchType: 'exact_code' | 'partial_code' | 'product' | 'supplier';

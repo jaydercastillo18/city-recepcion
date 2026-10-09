@@ -1,114 +1,40 @@
-// ============================================================
-// CITY RECEPCIÓN - Generador de Reporte Excel (.xlsx)
-// Compatible con Next.js 16 y Vercel Serverless
-// ============================================================
 import * as XLSX from 'xlsx';
-import type { Shipment, ShipmentItem, ShipmentStats, Incident } from '@/types';
-import { formatDate, getItemStatusLabel, getShipmentStatusLabel } from '@/lib/utils';
+import type { ReportData } from './pdf-generator';
+import { formatDate } from '@/lib/utils';
+import { detailRows, reportDate, shipmentReportStatus, finalizationRows } from './report-rows';
 
-export interface ReportData {
-  shipment: Shipment;
-  items: ShipmentItem[];
-  stats: ShipmentStats;
-  incidents: Incident[];
-  generatedAt: string;
-}
+export type { ReportData } from './pdf-generator';
 
 export function generateShipmentExcel(data: ReportData): Uint8Array {
-  const { shipment, items, stats, incidents, generatedAt } = data;
-
+  const { shipment, items, stats, incidents, generatedAt, responsible } = data;
   const wb = XLSX.utils.book_new();
-
-  // --- HOJA 1: Detalle ---
-  // Columnas exactas requeridas:
-  // Proveedor | Código | Producto | Esperadas | Recibidas | Diferencia | Estado
-  const detailRows = items.map((item) => {
-    const diff = item.received_boxes - item.expected_boxes;
-    return {
-      Proveedor: item.supplier || 'N/A',
-      Código: item.code_original,
-      Producto: item.product_name,
-      Esperadas: item.expected_boxes,
-      Recibidas: item.received_boxes,
-      Diferencia: diff,
-      Estado: getItemStatusLabel(item.status),
-    };
-  });
-
-  const wsDetail = XLSX.utils.json_to_sheet(detailRows);
-
-  // Auto ancho de columnas para la hoja Detalle
-  wsDetail['!cols'] = [
-    { wch: 22 }, // Proveedor
-    { wch: 18 }, // Código
-    { wch: 45 }, // Producto
-    { wch: 12 }, // Esperadas
-    { wch: 12 }, // Recibidas
-    { wch: 12 }, // Diferencia
-    { wch: 14 }, // Estado
+  const summary = [
+    ['Sistema', 'CITY OFERTAS · RECEPCIÓN'], ['Envío', shipment.shipment_number], ['Destino', shipment.destination],
+    ['Fecha de envío', formatDate(shipment.shipment_date, 'long')], ['Estado', shipmentReportStatus(shipment)],
+    ['Responsable de emisión (sesión activa)', responsible], ['Fecha / hora', generatedAt],
+    ['Cajas esperadas', stats.total_expected], ['Cajas recibidas', stats.total_received], ['Cajas faltantes', stats.boxes_missing],
+    ['Productos', items.length], ['Completos', stats.total_complete], ['Parciales', stats.total_partial],
+    ['Pendientes', stats.total_pending], ['Con exceso', stats.total_excess], ['Observaciones / incidencias', incidents.length],
+    ['Diferencia', 'Recibidas - esperadas; negativo indica faltante'],
+    ...finalizationRows(shipment),
   ];
-
-  XLSX.utils.book_append_sheet(wb, wsDetail, 'Detalle');
-
-  // --- HOJA 2: Resumen ---
-  const pct = stats.total_expected > 0
-    ? Number(((stats.total_received / stats.total_expected) * 100).toFixed(1))
-    : 0;
-
-  const summaryRows = [
-    { Parámetro: 'Sistema', Valor: 'CITY RECEPCIÓN' },
-    { Parámetro: 'Número de Envío', Valor: shipment.shipment_number },
-    { Parámetro: 'Destino', Valor: shipment.destination },
-    { Parámetro: 'Fecha de Envío', Valor: formatDate(shipment.shipment_date, 'long') },
-    { Parámetro: 'Estado de Recepción', Valor: getShipmentStatusLabel(shipment.status) },
-    { Parámetro: 'Fecha / Hora de Generación', Valor: generatedAt },
-    { Parámetro: '----------------------------------------', Valor: '--------------------' },
-    { Parámetro: 'Total Cajas Esperadas', Valor: stats.total_expected },
-    { Parámetro: 'Total Cajas Recibidas', Valor: stats.total_received },
-    { Parámetro: 'Porcentaje de Avance (%)', Valor: `${pct}%` },
-    { Parámetro: 'Total Productos Distintos', Valor: items.length },
-    { Parámetro: 'Productos Completos', Valor: stats.total_complete },
-    { Parámetro: 'Productos Parciales', Valor: stats.total_partial },
-    { Parámetro: 'Productos Pendientes', Valor: stats.total_pending },
-    { Parámetro: 'Productos con Exceso', Valor: stats.total_excess },
-    { Parámetro: 'Cajas Faltantes', Valor: stats.boxes_missing },
-    { Parámetro: 'Total Incidencias Registradas', Valor: incidents.length },
-  ];
-
-  const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
-  wsSummary['!cols'] = [{ wch: 35 }, { wch: 30 }];
-  XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen');
-
-  // --- HOJA 3: Incidencias ---
-  const incidentRows = incidents.length > 0
-    ? incidents.map((inc, idx) => ({
-        Nro: idx + 1,
-        Tipo: inc.type.toUpperCase(),
-        Descripción: inc.description,
-        Fecha: inc.created_at ? formatDate(inc.created_at, 'short') : '-',
-        Estado: inc.resolved_at ? 'Resuelto' : 'Abierto',
-      }))
-    : [
-        {
-          Nro: 1,
-          Tipo: 'SIN INCIDENCIAS',
-          Descripción: 'No se han registrado incidencias para este envío',
-          Fecha: '-',
-          Estado: 'N/A',
-        },
-      ];
-
-  const wsIncidents = XLSX.utils.json_to_sheet(incidentRows);
-  wsIncidents['!cols'] = [
-    { wch: 6 },
-    { wch: 18 },
-    { wch: 55 },
-    { wch: 15 },
-    { wch: 12 },
-  ];
-  XLSX.utils.book_append_sheet(wb, wsIncidents, 'Incidencias');
-
-  // Generar buffer XLSX
-  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  return new Uint8Array(buffer);
+  const ws = XLSX.utils.aoa_to_sheet([['Concepto', 'Valor'], ...summary]);
+  ws['!cols'] = [{ wch: 42 }, { wch: 65 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
+  const headers = ['Proveedor', 'Código', 'Producto', 'Esperadas', 'Recibidas', 'Diferencia', 'Estado', 'Observación / incidencia'];
+  function append(name: string, rows: Record<string, string | number>[], columns: string[], widths: number[]) {
+    const sheet = XLSX.utils.json_to_sheet(rows, { header: columns });
+    sheet['!cols'] = widths.map(wch => ({ wch }));
+    sheet['!autofilter'] = { ref: sheet['!ref']! };
+    XLSX.utils.book_append_sheet(wb, sheet, name);
+  }
+  append('Detalle', detailRows(items, incidents), headers, [24, 20, 45, 12, 12, 12, 14, 70]);
+  append('Faltantes', detailRows(items.filter(i => i.expected_boxes > i.received_boxes), incidents), headers, [24, 20, 45, 12, 12, 12, 14, 70]);
+  append('Observaciones-Incidencias', incidents.map(incident => {
+    const item = items.find(i => i.id === incident.shipment_item_id);
+    return { Proveedor: item?.supplier || '-', Código: item?.code_original || '-', Producto: item?.product_name || 'General del envío',
+      Tipo: incident.type === 'other' ? 'Observación' : incident.type, Descripción: incident.description,
+      'Fecha / hora': reportDate(incident.created_at), Estado: incident.resolved_at ? 'Resuelto' : 'Abierto' };
+  }), ['Proveedor', 'Código', 'Producto', 'Tipo', 'Descripción', 'Fecha / hora', 'Estado'], [24, 20, 45, 20, 70, 30, 14]);
+  return new Uint8Array(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }

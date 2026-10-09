@@ -3,8 +3,9 @@
 // CITY RECEPCIÓN - Server Actions para Envíos
 // ============================================================
 import { createClient } from '@/lib/supabase/server';
+import { readAllRows } from '@/lib/supabase/read-all-rows';
 import { revalidatePath } from 'next/cache';
-import type { Shipment, ShipmentStatus, CreateShipmentInput } from '@/types';
+import type { Shipment, ShipmentStatus, CreateShipmentInput, ShipmentItem, Incident } from '@/types';
 
 /**
  * Obtiene todos los envíos activos (receiving) para la pantalla de recepción.
@@ -12,11 +13,11 @@ import type { Shipment, ShipmentStatus, CreateShipmentInput } from '@/types';
 export async function getActiveShipments(): Promise<Shipment[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await readAllRows((from, to) => supabase
     .from('shipments')
     .select('*')
     .in('status', ['receiving', 'draft'])
-    .order('shipment_date', { ascending: true });
+    .order('shipment_date', { ascending: true }).order('id').range(from, to));
 
   if (error) {
     console.error('[getActiveShipments]', error);
@@ -52,18 +53,25 @@ export async function getShipmentById(id: string): Promise<Shipment | null> {
 export async function getShipmentItems(shipmentId: string) {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await readAllRows((from, to) => supabase
     .from('shipment_items')
     .select('*')
     .eq('shipment_id', shipmentId)
-    .order('code_original', { ascending: true });
+    .order('code_original', { ascending: true }).order('id').range(from, to));
 
   if (error) {
     console.error('[getShipmentItems]', error);
-    return [];
+    throw new Error('No se pudieron cargar todos los productos del envío.');
   }
 
-  return data ?? [];
+  const { data: incidents, error: incidentError } = await readAllRows((from, to) => supabase.from('incidents')
+    .select('*').eq('shipment_id', shipmentId).order('created_at').order('id').range(from, to));
+  if (incidentError) throw new Error('No se pudieron cargar las observaciones del envío.');
+  return ((data ?? []) as ShipmentItem[]).map(item => ({
+    ...item,
+    observations: ((incidents ?? []) as Incident[])
+      .filter(incident => incident.shipment_item_id === item.id).map(incident => incident.description),
+  }));
 }
 
 /**
@@ -102,6 +110,10 @@ export async function updateShipmentStatus(
   shipmentId: string,
   status: ShipmentStatus
 ): Promise<{ error?: string }> {
+  if (status === 'completed') {
+    const result = await finalizeShipmentAction(shipmentId);
+    return result.success ? {} : { error: result.error };
+  }
   const supabase = await createClient();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -125,10 +137,11 @@ export async function updateShipmentStatus(
 export async function getAllShipments(): Promise<Shipment[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await readAllRows((from, to) => supabase
     .from('shipments')
     .select('*')
-    .order('shipment_date', { ascending: false });
+    .order('shipment_date', { ascending: false })
+    .order('created_at', { ascending: false }).order('id').range(from, to));
 
   if (error) {
     console.error('[getAllShipments]', error);
@@ -161,17 +174,17 @@ export async function getShipmentFinalizeSummary(
   const supabase = await createClient();
 
   const [itemsRes, incidentsRes] = await Promise.all([
-    supabase
+    readAllRows((from, to) => supabase
       .from('shipment_items')
       .select('expected_boxes, received_boxes, status')
-      .eq('shipment_id', shipmentId),
+      .eq('shipment_id', shipmentId).order('id').range(from, to)),
     supabase
       .from('incidents')
       .select('id', { count: 'exact', head: true })
       .eq('shipment_id', shipmentId),
   ]);
 
-  if (itemsRes.error || !itemsRes.data) {
+  if (itemsRes.error || !itemsRes.data || incidentsRes.error) {
     return { error: 'Error al consultar productos del envío' };
   }
 
@@ -206,7 +219,7 @@ export async function getShipmentFinalizeSummary(
     else if (item.status === 'excess') excessCount++;
   }
 
-  const canFinalize = missingBoxes === 0 && pendingCount === 0 && partialCount === 0;
+  const canFinalize = items.length > 0;
 
   return {
     summary: {
@@ -226,10 +239,12 @@ export async function getShipmentFinalizeSummary(
 }
 
 /**
- * Finaliza formalmente la recepción del envío (solo admin y sin faltantes).
+ * Cierre admin atómico, con aceptación expresa si hay faltantes.
  */
 export async function finalizeShipmentAction(
-  shipmentId: string
+  shipmentId: string,
+  confirmShortage = false,
+  notes = ''
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
 
@@ -253,42 +268,19 @@ export async function finalizeShipmentAction(
     return { success: false, error: 'Solo los administradores pueden finalizar la recepción.' };
   }
 
-  // Verificar productos
-  const { data: itemsData, error: itemsError } = await supabase
-    .from('shipment_items')
-    .select('expected_boxes, received_boxes, status')
-    .eq('shipment_id', shipmentId);
-
-  if (itemsError || !itemsData) {
-    return { success: false, error: 'Error al consultar productos del envío.' };
+  if (typeof notes !== 'string' || notes.length > 2000 || typeof confirmShortage !== 'boolean') {
+    return { success: false, error: 'Revisa la confirmación y el motivo del cierre (máximo 2000 caracteres).' };
   }
-
-  const items = itemsData as unknown as { expected_boxes: number; received_boxes: number; status: string }[];
-
-  const hasIncomplete = items.some(
-    (item) => item.status === 'pending' || item.status === 'partial' || item.received_boxes < item.expected_boxes
-  );
-
-  if (hasIncomplete) {
-    return {
-      success: false,
-      error: 'No se puede finalizar la recepción: existen productos pendientes o con cajas faltantes.',
-    };
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: updateError } = await (supabase.from('shipments') as any)
-    .update({ status: 'completed' })
-    .eq('id', shipmentId);
-
-  if (updateError) {
-    return { success: false, error: updateError.message };
-  }
+  const { error } = await supabase.rpc('finalize_shipment_admin', {
+    p_shipment_id: shipmentId, p_confirm_shortage: confirmShortage, p_notes: notes.trim() || null,
+  });
+  if (error) return { success: false, error: error.code === 'PGRST202' || error.code === '42883'
+    ? 'Aplica la nueva migración de cierre y eliminación en Supabase para habilitar esta acción.' : error.message };
 
   revalidatePath('/recepcion');
   revalidatePath(`/recepcion/${shipmentId}`);
   revalidatePath('/admin/envios');
+  revalidatePath('/admin');
 
   return { success: true };
 }
-

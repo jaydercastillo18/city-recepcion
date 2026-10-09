@@ -2,6 +2,8 @@
 // CITY RECEPCIÓN - Página principal /recepcion
 // Lista de envíos activos
 // ============================================================
+import WarehouseHero from '@/components/layout/warehouse-hero';
+import ShipmentBackdrop from '@/components/layout/shipment-backdrop';
 import { Suspense } from 'react';
 import { Boxes, ArrowRight, ClipboardList } from 'lucide-react';
 import Link from 'next/link';
@@ -128,6 +130,7 @@ function ShipmentsSkeleton() {
         <div key={i} className="card-base p-6 animate-pulse space-y-4">
           <div className="flex justify-between items-start">
             <div className="space-y-2">
+      <WarehouseHero />
               <div className="h-5 w-40 bg-slate-800 rounded" />
               <div className="h-4 w-28 bg-slate-800 rounded" />
             </div>
@@ -175,7 +178,8 @@ async function ShipmentsList() {
 
 export default function RecepcionPage() {
   return (
-    <div>
+    <div className="shipment-scene">
+      <ShipmentBackdrop />
       {/* Page Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">

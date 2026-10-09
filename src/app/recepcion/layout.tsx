@@ -36,6 +36,8 @@ export default async function RecepcionLayout({
     .eq('id', user.id)
     .single() as { data: Pick<Profile, 'full_name' | 'role'> | null };
 
+  if (profile?.role === 'employee') redirect('/asistencia');
+
   return (
     <div className="min-h-dvh flex flex-col">
       <AppHeader
