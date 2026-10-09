@@ -1,10 +1,11 @@
 "use client";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { saveEmployee, inviteEmployee } from "../actions";
 import type { Employee } from "../types";
 import MutationForm from "./mutation-form";
+import AccessDialog, { ACCOUNT_LABEL, EMAIL_LABEL } from "./access-dialog";
+import type { AccessResult } from "../invitations";
 import { normalizeName } from "../domain";
 export function EmployeeEditor({
   employee,
@@ -16,176 +17,210 @@ export function EmployeeEditor({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [createAccess, setCreateAccess] = useState(!employee);
+  const [created, setCreated] = useState<{
+    employee: Employee;
+    access: AccessResult;
+  } | null>(null);
   const [tolerance, setTolerance] = useState(
     employee?.late_tolerance_minutes ?? 5,
   );
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger className="btn-ghost">
-        {label ?? (employee ? "Editar" : "Agregar empleado")}
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/70 z-50" />
-        <Dialog.Content className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-lg max-h-[90dvh] overflow-y-auto card-base p-6">
-          <Dialog.Title className="text-xl font-bold mb-2">
-            {employee ? "Editar empleado" : "Agregar empleado"}
-          </Dialog.Title>
-          <Dialog.Description className="text-sm text-slate-400 mb-5">
-            El código interno es estable. Los cambios quedan auditados.
-          </Dialog.Description>
-          <MutationForm
-            action={saveEmployee}
-            onSuccess={() => {
-              setOpen(false);
-              onSaved?.();
-            }}
-          >
-            <input type="hidden" name="id" value={employee?.id ?? ""} />
-            <label className="block">
-              Nombre
-              <input
-                name="full_name"
-                defaultValue={employee?.full_name}
-                required
-                minLength={2}
-                maxLength={200}
-                className="import-input"
-              />
-            </label>
-            <label className="block">
-              Cargo / función
-              <input
-                name="position"
-                defaultValue={employee?.position}
-                maxLength={200}
-                className="import-input"
-              />
-            </label>
-            <label className="block">
-              Correo
-              <input
-                name="email"
-                type="email"
-                defaultValue={employee?.email ?? ""}
-                readOnly={Boolean(employee?.profile_id)}
-                className="import-input"
-              />
-            </label>
-            <label className="block">
-              Teléfono
-              <input
-                name="phone"
-                type="tel"
-                defaultValue={employee?.phone ?? ""}
-                maxLength={40}
-                className="import-input"
-              />
-            </label>
-            <fieldset className="space-y-2">
-              <legend>Tolerancia individual</legend>
-              <div className="flex flex-wrap gap-2">
-                {[0, 5, 10, 15].map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    aria-pressed={tolerance === v}
-                    className="btn-ghost"
-                    onClick={() => setTolerance(v)}
-                  >
-                    {v} min
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() =>
-                    document
-                      .getElementById(`tolerance-${employee?.id ?? "new"}`)
-                      ?.focus()
-                  }
-                >
-                  Personalizado
-                </button>
-              </div>
+    <>
+      {created && (
+        <AccessDialog
+          employee={created.employee}
+          initial={created.access}
+          onClose={() => setCreated(null)}
+        />
+      )}
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Trigger className="btn-ghost">
+          {label ?? (employee ? "Editar" : "Agregar empleado")}
+        </Dialog.Trigger>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/70 z-50" />
+          <Dialog.Content className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-lg max-h-[90dvh] overflow-y-auto card-base p-6">
+            <Dialog.Title className="text-xl font-bold mb-2">
+              {employee ? "Editar empleado" : "Agregar empleado"}
+            </Dialog.Title>
+            <Dialog.Description className="text-sm text-slate-400 mb-5">
+              El código interno es estable. Los cambios quedan auditados.
+            </Dialog.Description>
+            <MutationForm
+              button={
+                !employee && createAccess ? "Guardar y crear acceso" : "Guardar"
+              }
+              action={async (form) => {
+                const saved = await saveEmployee(form);
+                if (
+                  !saved.error &&
+                  !employee &&
+                  createAccess &&
+                  "data" in saved &&
+                  saved.data
+                ) {
+                  const person = saved.data as unknown as Employee;
+                  const access = await inviteEmployee(person.id);
+                  setCreated({ employee: person, access });
+                }
+                return saved;
+              }}
+              onSuccess={() => {
+                setOpen(false);
+                onSaved?.();
+              }}
+            >
+              <input type="hidden" name="id" value={employee?.id ?? ""} />
               <label className="block">
-                Minutos (0–120)
+                Nombre
                 <input
-                  id={`tolerance-${employee?.id ?? "new"}`}
-                  name="late_tolerance_minutes"
-                  type="number"
-                  min={0}
-                  max={120}
-                  step={1}
+                  name="full_name"
+                  defaultValue={employee?.full_name}
                   required
-                  value={tolerance}
-                  onChange={(event) => setTolerance(Number(event.target.value))}
+                  minLength={2}
+                  maxLength={200}
                   className="import-input"
                 />
               </label>
-            </fieldset>
-            <label className="flex gap-3 items-center">
-              <input
-                type="checkbox"
-                name="active"
-                defaultChecked={employee?.active ?? true}
-                className="w-5 h-5"
-              />{" "}
-              Activo
-            </label>
-            <label className="block">
-              Motivo
-              <input
-                name="reason"
-                required
-                minLength={3}
-                maxLength={2000}
-                defaultValue={employee ? "" : "Alta de personal"}
-                className="import-input"
-              />
-            </label>
-          </MutationForm>
-          <Dialog.Close className="btn-ghost w-full mt-3">
-            Cancelar
-          </Dialog.Close>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+              <label className="block">
+                Cargo / función
+                <input
+                  name="position"
+                  defaultValue={employee?.position}
+                  maxLength={200}
+                  className="import-input"
+                />
+              </label>
+              <label className="block">
+                Correo
+                <input
+                  name="email"
+                  type="email"
+                  required={!employee && createAccess}
+                  defaultValue={employee?.email ?? ""}
+                  readOnly={Boolean(employee?.profile_id)}
+                  className="import-input"
+                />
+              </label>
+              <label className="block">
+                Teléfono
+                <input
+                  name="phone"
+                  type="tel"
+                  defaultValue={employee?.phone ?? ""}
+                  maxLength={40}
+                  className="import-input"
+                />
+              </label>
+              <fieldset className="space-y-2">
+                <legend>Tolerancia individual</legend>
+                <div className="flex flex-wrap gap-2">
+                  {[0, 5, 10, 15].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      aria-pressed={tolerance === v}
+                      className="btn-ghost"
+                      onClick={() => setTolerance(v)}
+                    >
+                      {v} min
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() =>
+                      document
+                        .getElementById(`tolerance-${employee?.id ?? "new"}`)
+                        ?.focus()
+                    }
+                  >
+                    Personalizado
+                  </button>
+                </div>
+                <label className="block">
+                  Minutos (0–120)
+                  <input
+                    id={`tolerance-${employee?.id ?? "new"}`}
+                    name="late_tolerance_minutes"
+                    type="number"
+                    min={0}
+                    max={120}
+                    step={1}
+                    required
+                    value={tolerance}
+                    onChange={(event) =>
+                      setTolerance(Number(event.target.value))
+                    }
+                    className="import-input"
+                  />
+                </label>
+              </fieldset>
+              {!employee && (
+                <label className="flex gap-3 items-center">
+                  <input
+                    type="checkbox"
+                    checked={createAccess}
+                    onChange={(event) => setCreateAccess(event.target.checked)}
+                    className="w-5 h-5"
+                  />
+                  Crear acceso al guardar (requiere correo)
+                </label>
+              )}
+              <label className="flex gap-3 items-center">
+                <input
+                  type="checkbox"
+                  name="active"
+                  defaultChecked={employee?.active ?? true}
+                  className="w-5 h-5"
+                />{" "}
+                Activo
+              </label>
+              <label className="block">
+                Motivo
+                <input
+                  name="reason"
+                  required
+                  minLength={3}
+                  maxLength={2000}
+                  defaultValue={employee ? "" : "Alta de personal"}
+                  className="import-input"
+                />
+              </label>
+            </MutationForm>
+            <Dialog.Close className="btn-ghost w-full mt-3">
+              Cancelar
+            </Dialog.Close>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </>
   );
 }
 function InviteButton({ employee }: { employee: Employee }) {
-  const [pending, start] = useTransition(),
-    [message, setMessage] = useState("");
-  const router = useRouter();
+  const [open, setOpen] = useState(false);
   return (
-    <div>
+    <>
       <button
         disabled={
-          pending ||
           !employee.active ||
           !employee.email ||
-          Boolean(employee.profile_id)
+          employee.access_status === "activated"
         }
         className="btn-ghost"
-        onClick={() =>
-          start(async () => {
-            const r = await inviteEmployee(employee.id);
-            setMessage(r.error ?? r.message ?? "");
-            if (!r.error) router.refresh();
-          })
-        }
+        onClick={() => setOpen(true)}
       >
-        {employee.profile_id
-          ? "Cuenta vinculada"
-          : pending
-            ? "Enviando…"
-            : "Enviar invitación"}
+        {employee.access_status === "activated"
+          ? "Cuenta activada"
+          : employee.profile_id
+            ? "Gestionar acceso"
+            : "Crear acceso"}
       </button>
-      {message && (
-        <p role="status" className="text-xs text-purple-200 mt-2 max-w-sm">
-          {message}
-        </p>
+      {open && (
+        <AccessDialog employee={employee} onClose={() => setOpen(false)} />
       )}
-    </div>
+    </>
   );
 }
 export default function Personal({ employees }: { employees: Employee[] }) {
@@ -236,6 +271,14 @@ export default function Personal({ employees }: { employees: Employee[] }) {
               {e.employee_code} · {e.active ? "Activo" : "Inactivo"}
             </p>
             <h2 className="font-bold text-lg">{e.full_name}</h2>
+            <p className="text-sm text-purple-200">
+              {
+                ACCOUNT_LABEL[
+                  e.access_status ?? (e.profile_id ? "pending" : "no_access")
+                ]
+              }{" "}
+              · Correo: {EMAIL_LABEL[e.invitation_email_status ?? "not_sent"]}
+            </p>
             <p className="text-purple-200 text-sm">
               Tolerancia: {e.late_tolerance_minutes} minutos
             </p>

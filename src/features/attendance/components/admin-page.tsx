@@ -17,6 +17,22 @@ export default async function AttendanceAdminPage({
     await attendanceSession(true);
     data = await getAttendanceData(from, to);
     const { client } = await attendanceSession(true);
+    if (section === "personal") {
+      const statuses = await client.rpc("attendance_admin_command", {
+        p_action: "access_statuses",
+        p_data: { reason: "Consultar estados de acceso de personal" },
+      });
+      if (statuses.error)
+        throw new Error("No se pudieron consultar los estados de acceso.");
+      const states = statuses.data as Record<
+        string,
+        import("../invitations").AccountState
+      >;
+      data.employees = data.employees.map((e) => ({
+        ...e,
+        access_status: states[e.id] ?? "no_access",
+      }));
+    }
     const audit =
       section === "historial"
         ? await client

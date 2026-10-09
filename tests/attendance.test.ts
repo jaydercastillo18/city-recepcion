@@ -99,7 +99,7 @@ async function mark(path: string) {
 }
 before(async () => {
   await db.exec(`CREATE ROLE authenticated; CREATE ROLE anon; CREATE SCHEMA auth; CREATE SCHEMA storage;
- CREATE TABLE auth.users(id uuid PRIMARY KEY,email text,raw_user_meta_data jsonb);
+ CREATE TABLE auth.users(id uuid PRIMARY KEY,email text,raw_user_meta_data jsonb,email_confirmed_at timestamptz,encrypted_password text DEFAULT '');
  CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
  CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
  CREATE TABLE storage.objects(id uuid DEFAULT gen_random_uuid(),bucket_id text,name text,owner_id text); ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
@@ -120,10 +120,10 @@ before(async () => {
     [first, "warehouse"],
     [second, "warehouse"],
   ]) {
-    await db.query("INSERT INTO auth.users VALUES($1,$2,'{}')", [
-      id,
-      `${id}@test.invalid`,
-    ]);
+    await db.query(
+      "INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,'{}')",
+      [id, `${id}@test.invalid`],
+    );
     await db.query("UPDATE public.profiles SET role=$1 WHERE id=$2", [
       role,
       id,
@@ -134,6 +134,7 @@ before(async () => {
     "INSERT INTO storage.buckets(id,name,public) VALUES('attendance-evidence','attendance-evidence',true)",
   );
   await db.exec(sql);
+  await db.exec(readFileSync("supabase/migrations/20261009025154_attendance_access_links.sql", "utf8"));
   await db.query(
     "UPDATE public.profiles SET role='employee' WHERE id IN ($1,$2)",
     [first, second],
@@ -170,10 +171,10 @@ test("admin ve todos los empleados; employee solo su ficha", async () => {
 test("marcación puntual usa reloj PostgreSQL y foto propia", async () => {
   const user = randomUUID();
   await db.exec("RESET ROLE");
-  await db.query("INSERT INTO auth.users VALUES($1,$2,'{}')", [
-    user,
-    `${user}@test.invalid`,
-  ]);
+  await db.query(
+    "INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,'{}')",
+    [user, `${user}@test.invalid`],
+  );
   const f = await fixture(user);
   await as(user);
   const result = await mark(f.path);
@@ -185,10 +186,10 @@ test("marcación puntual usa reloj PostgreSQL y foto propia", async () => {
 test("tardanza calculada y employee no puede modificar ni insertar estados", async () => {
   const user = randomUUID();
   await db.exec("RESET ROLE");
-  await db.query("INSERT INTO auth.users VALUES($1,$2,'{}')", [
-    user,
-    `${user}@test.invalid`,
-  ]);
+  await db.query(
+    "INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,'{}')",
+    [user, `${user}@test.invalid`],
+  );
   const f = await fixture(user, -20);
   await as(user);
   const result = await mark(f.path);
@@ -206,10 +207,10 @@ test("tardanza calculada y employee no puede modificar ni insertar estados", asy
 test("descanso no permite marcar", async () => {
   const user = randomUUID();
   await db.exec("RESET ROLE");
-  await db.query("INSERT INTO auth.users VALUES($1,$2,'{}')", [
-    user,
-    `${user}@test.invalid`,
-  ]);
+  await db.query(
+    "INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,'{}')",
+    [user, `${user}@test.invalid`],
+  );
   const f = await fixture(user, 0, true);
   await as(user);
   await assert.rejects(mark(f.path), /descanso/);
@@ -511,10 +512,10 @@ test("reporte employee contiene exclusivamente sus datos autorizados por RLS", a
 test("una foto ajena no sirve como evidencia para marcar", async () => {
   const user = randomUUID();
   await db.exec("RESET ROLE");
-  await db.query("INSERT INTO auth.users VALUES($1,$2,'{}')", [
-    user,
-    `${user}@test.invalid`,
-  ]);
+  await db.query(
+    "INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,'{}')",
+    [user, `${user}@test.invalid`],
+  );
   const f = await fixture(user);
   await db.exec("RESET ROLE");
   await db.query("UPDATE storage.objects SET owner_id=$1 WHERE name=$2", [
@@ -625,11 +626,10 @@ test("fallo de importación revierte todos los horarios y el registro de importa
 test("nueva cuenta ignora rol de metadata y código interno sobrevive cambio de nombre", async () => {
   const user = randomUUID();
   await db.exec("RESET ROLE");
-  await db.query("INSERT INTO auth.users VALUES($1,$2,$3::jsonb)", [
-    user,
-    `${user}@test.invalid`,
-    JSON.stringify({ role: "admin" }),
-  ]);
+  await db.query(
+    "INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,$3::jsonb)",
+    [user, `${user}@test.invalid`, JSON.stringify({ role: "admin" })],
+  );
   assert.equal(
     (
       await db.query<{ role: string }>(
@@ -748,10 +748,10 @@ test("cierre transforma un pending existente en absent con antes/después", asyn
 test("employee activo puede marcar un pending corregido y no puede eliminar evidencia auditada", async () => {
   const user = randomUUID();
   await db.exec("RESET ROLE");
-  await db.query("INSERT INTO auth.users VALUES($1,$2,'{}')", [
-    user,
-    `${user}@test.invalid`,
-  ]);
+  await db.query(
+    "INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,'{}')",
+    [user, `${user}@test.invalid`],
+  );
   const f = await fixture(user);
   await as(user);
   await mark(f.path);
@@ -864,10 +864,10 @@ for (const tolerance of [0, 5, 10]) {
   test(`empleado con tolerancia individual ${tolerance}: marcación real y snapshot`, async () => {
     const user = randomUUID();
     await db.exec("RESET ROLE");
-    await db.query("INSERT INTO auth.users VALUES($1,$2,'{}')", [
-      user,
-      `${user}@test.invalid`,
-    ]);
+    await db.query(
+      "INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,'{}')",
+      [user, `${user}@test.invalid`],
+    );
     const f = await fixture(user, -6);
     await as(admin);
     await command("employee", {
@@ -1313,10 +1313,10 @@ test("vista previa distingue NUEVO, SIN CAMBIOS, ACTUALIZAR y ERROR", () => {
 test("day permite marcar aunque haya night; night rechaza RPC incluso sin foto", async () => {
   const user = randomUUID();
   await db.exec("RESET ROLE");
-  await db.query("INSERT INTO auth.users VALUES($1,$2,'{}')", [
-    user,
-    `${user}@test.invalid`,
-  ]);
+  await db.query(
+    "INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,'{}')",
+    [user, `${user}@test.invalid`],
+  );
   const f = await fixture(user);
   await as(admin);
   await command("schedule", {
@@ -1354,10 +1354,10 @@ test("day permite marcar aunque haya night; night rechaza RPC incluso sin foto",
 test("solo night rechaza marcación sin selección y nunca requiere foto", async () => {
   const user = randomUUID();
   await db.exec("RESET ROLE");
-  await db.query("INSERT INTO auth.users VALUES($1,$2,'{}')", [
-    user,
-    `${user}@test.invalid`,
-  ]);
+  await db.query(
+    "INSERT INTO auth.users(id,email,raw_user_meta_data) VALUES($1,$2,'{}')",
+    [user, `${user}@test.invalid`],
+  );
   const f = await fixture(user);
   await db.exec("RESET ROLE");
   await db.query(
@@ -1492,4 +1492,60 @@ test("night importado se conserva como horario informativo y separado en PDF/Exc
     "latin1",
   );
   assert.ok(pdf.includes("Sin control de asistencia"));
+});
+
+test("estado de cuenta y correo separados: admin consulta y employee no modifica", async () => {
+  await as(admin);
+  const initial = await command("access_statuses", {});
+  assert.equal(initial[a.id], "pending");
+  await command("invitation_email", {
+    id: a.id,
+    status: "rate_limited",
+    action_link: "SECRET_NEVER_AUDIT",
+  });
+  const pending = await command("access_statuses", {});
+  assert.equal(pending[a.id], "pending");
+  const audit = (
+    await db.query<{ after_data: unknown }>(
+      "SELECT after_data FROM public.attendance_audit_log WHERE action='invitation_email' AND employee_id=$1",
+      [a.id],
+    )
+  ).rows;
+  assert.deepEqual(audit.at(-1)?.after_data, { email_status: "rate_limited" });
+  assert.ok(!JSON.stringify(audit).includes("SECRET_NEVER_AUDIT"));
+  await db.exec("RESET ROLE");
+  await db.query(
+    "UPDATE auth.users SET email_confirmed_at=now(),encrypted_password='mock_password_hash' WHERE id=$1",
+    [first],
+  );
+  await as(admin);
+  assert.equal((await command("access_statuses", {}))[a.id], "activated");
+  await command("invitation_email", { id: a.id, status: "error" });
+  assert.equal((await command("access_statuses", {}))[a.id], "activated");
+  await as(first);
+  await assert.rejects(
+    command("invitation_email", { id: a.id, status: "sent" }),
+    /Solo administradores/,
+  );
+  await assert.rejects(command("access_statuses", {}), /Solo administradores/);
+});
+test("enlaces sensibles nunca aparecen en PDF ni en las hojas Excel", () => {
+  const secret = "SECRET_ACTION_LINK_NEVER_EXPORT";
+  const employee = {
+    ...a,
+    action_link: `https://auth.example/verify?token=${secret}`,
+  };
+  const data = { ...nightData(), employees: [employee] };
+  const wb = XLSX.read(attendanceExcel(data, "Administrador"), {
+    type: "array",
+  });
+  const cells = wb.SheetNames.map((name) =>
+    XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1 }),
+  );
+  assert.ok(!JSON.stringify(cells).includes(secret));
+  assert.ok(
+    !Buffer.from(attendancePdf(data, "Administrador"))
+      .toString("latin1")
+      .includes(secret),
+  );
 });

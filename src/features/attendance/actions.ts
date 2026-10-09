@@ -2,6 +2,14 @@
 import { revalidatePath } from "next/cache";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { attendanceSession } from "./server";
+import {
+  createEmployeeAccess,
+  sendEmployeeInvitationEmail,
+  AccessOperationError,
+  type InvitationPorts,
+  type InviteAccount,
+  type AccessResult,
+} from "./invitations";
 import type { Json } from "@/types/database";
 function text(form: FormData, key: string) {
   return String(form.get(key) ?? "").trim();
@@ -88,82 +96,132 @@ export async function correctAttendance(form: FormData) {
     reason: text(form, "reason"),
   });
 }
-export async function inviteEmployee(employeeId: string) {
+async function invitationPorts() {
+  const { client } = await attendanceSession(true);
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const site = process.env.APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
+  if (!secret || !site)
+    throw new AccessOperationError(
+      "Configura APP_URL y la clave administrativa del servidor para crear accesos.",
+    );
+  let siteUrl: URL;
   try {
-    const { client } = await attendanceSession(true);
-    const { data: employee, error } = await client
-      .from("employees")
-      .select("*")
-      .eq("id", employeeId)
-      .single();
-    if (error || !employee || !employee.active || !employee.email)
-      return { error: "El empleado debe estar activo y tener correo." };
-    if (employee.profile_id)
-      return { error: "El empleado ya tiene una cuenta vinculada." };
-    const lookup = await client.rpc("attendance_admin_command", {
-      p_action: "lookup_account",
-      p_data: {
-        email: employee.email,
-        reason: "Comprobar cuenta para invitación",
-      },
-    });
-    if (lookup.error) return { error: lookup.error.message };
-    const existing = lookup.data as { id: string; role: string } | null;
-    let id = existing?.id;
-    if (existing && existing.role !== "employee")
+    siteUrl = new URL(site);
+  } catch {
+    throw new AccessOperationError(
+      "La dirección del sistema no está configurada correctamente.",
+    );
+  }
+  if (!["http:", "https:"].includes(siteUrl.protocol))
+    throw new AccessOperationError(
+      "La dirección del sistema debe usar HTTP o HTTPS.",
+    );
+  const authAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    secret,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const ports: InvitationPorts = {
+    requireAdmin: async () => {
+      await attendanceSession(true);
+    },
+    siteOrigin: siteUrl.origin,
+    employee: async (id) => {
+      const r = await client
+        .from("employees")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (r.error || !r.data)
+        throw new AccessOperationError("Empleado no encontrado.");
+      return r.data;
+    },
+    lookup: async (email) => {
+      const r = await client.rpc("attendance_admin_command", {
+        p_action: "lookup_account",
+        p_data: { email, reason: "Consultar cuenta para acceso" },
+      });
+      if (r.error)
+        throw new AccessOperationError(
+          "No se pudo consultar la cuenta del empleado.",
+        );
+      return r.data as InviteAccount | null;
+    },
+    link: async (id, userId) => {
+      const r = await mutate("link", {
+        id,
+        profile_id: userId,
+        reason: "Crear acceso y vincular cuenta employee",
+      });
+      if (r.error)
+        throw new AccessOperationError(
+          "La cuenta existe pero no pudo vincularse. Vuelve a crear el acceso para completar la vinculación.",
+        );
+    },
+    recordEmail: async (id, status) => {
+      const r = await mutate("invitation_email", {
+        id,
+        status,
+        reason:
+          status === "not_sent"
+            ? "Generación de enlace de acceso sin correo"
+            : "Envío de invitación solicitado por admin",
+      });
+      if (r.error)
+        throw new AccessOperationError(
+          "No se pudo guardar el estado del correo. Consulta el estado antes de reintentar.",
+        );
+    },
+    generateLink: async (params) => {
+      const r = await authAdmin.auth.admin.generateLink(params);
       return {
-        error:
-          "Ese correo pertenece a una cuenta admin/warehouse. Usa un correo de empleado; no se cambiará su rol.",
+        userId: r.data.user?.id,
+        actionLink: r.data.properties?.action_link,
+        error: r.error ?? undefined,
       };
-    if (!id) {
-      const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      const site = process.env.APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
-      if (!secret || !site)
-        return {
-          error:
-            "Configura SUPABASE_SERVICE_ROLE_KEY (solo servidor) y APP_URL para enviar invitaciones.",
-        };
-      const siteUrl = new URL(site);
-      if (!["http:", "https:"].includes(siteUrl.protocol))
-        return { error: "APP_URL debe ser un origen HTTP(S) válido." };
-      const authAdmin = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        secret,
-        { auth: { persistSession: false, autoRefreshToken: false } },
-      );
-      const invited = await authAdmin.auth.admin.inviteUserByEmail(
-        employee.email,
-        {
-          redirectTo: `${siteUrl.origin}/auth/invitacion`,
-          data: { full_name: employee.full_name },
-        },
-      );
-      if (invited.error || !invited.data.user)
-        return {
-          error: invited.error?.message ?? "No se pudo enviar la invitación.",
-        };
-      id = invited.data.user.id;
-    }
-    const linked = await mutate("link", {
-      id: employee.id,
-      profile_id: id,
-      reason: existing
-        ? "Vinculación de cuenta employee existente"
-        : "Invitación por correo y vinculación de cuenta employee",
-    });
-    if (linked.error)
-      return {
-        error: `La cuenta existe, pero no se pudo vincular: ${linked.error}. Reintenta para completar la vinculación.`,
-      };
-    return {
-      success: true,
-      message: existing
-        ? "Cuenta existente vinculada; el empleado usa su contraseña actual."
-        : "Invitación enviada. El empleado elegirá su propia contraseña.",
-    };
+    },
+    sendEmail: async (email, redirectTo) => {
+      const r = await authAdmin.auth.admin.inviteUserByEmail(email, {
+        redirectTo,
+      });
+      return { error: r.error ?? undefined };
+    },
+  };
+  return ports;
+}
+export async function inviteEmployee(
+  employeeId: string,
+): Promise<AccessResult> {
+  try {
+    const result = await createEmployeeAccess(
+      await invitationPorts(),
+      employeeId,
+    );
+    revalidatePath("/admin/asistencia/personal");
+    return result;
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : "No se pudo invitar.",
+      error:
+        error instanceof AccessOperationError
+          ? error.message
+          : "No se pudo crear el acceso. Verifica tus permisos y la configuración del sistema.",
+    };
+  }
+}
+export async function sendInvitationEmail(
+  employeeId: string,
+): Promise<AccessResult> {
+  try {
+    return await sendEmployeeInvitationEmail(
+      await invitationPorts(),
+      employeeId,
+    );
+  } catch (error) {
+    return {
+      error:
+        error instanceof AccessOperationError
+          ? error.message
+          : "No se pudo enviar el correo. Verifica tus permisos e intenta más tarde.",
     };
   }
 }

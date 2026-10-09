@@ -2,21 +2,31 @@
 
 ## Arquitectura y estado de entrega
 
-Se implementaron las fases A–E en el proyecto Next.js existente, usando el mismo Supabase Auth, las mismas cookies y el mismo despliegue. No se crearon proyectos externos, no se enviaron correos de prueba y no se ejecutó SQL remoto. Este módulo todavía requiere aplicar manualmente la migración y configurar las invitaciones antes de usarlo con empleados reales.
+Se implementaron las fases A–E en el proyecto Next.js existente, usando el mismo Supabase Auth, las mismas cookies y el mismo despliegue. No se crearon proyectos externos, no se enviaron correos de prueba y no se ejecutó SQL remoto. La migración original `20261009001046_attendance_module.sql` ya está aplicada en Supabase remoto y existen empleados reales. No debe volver a ejecutarse. Los cambios nuevos de acceso requieren únicamente la migración incremental descrita abajo.
 
 El portal `/` dirige a admin a dos módulos, a employee a `/asistencia` y a warehouse a recepción. Administración de asistencia usa `/admin/asistencia` con Hoy, Personal, Horarios, Importar Excel, Historial, Reportes y Configuración. Se conserva el branding, header y fondo existente.
 
 ## SQL exacto y aplicación manual
 
-Archivo completo: [`../supabase/migrations/20261009001046_attendance_module.sql`](../supabase/migrations/20261009001046_attendance_module.sql).
+La migración original se conserva idéntica a la versión aplicada. SQL incremental completo: [`20261009025154_attendance_access_links.sql`](../supabase/migrations/20261009025154_attendance_access_links.sql).
 
-1. Revisar el archivo completo antes de ejecutarlo.
-2. En **el Supabase actual**, abrir SQL Editor y ejecutar únicamente este archivo nuevo, incluyendo `BEGIN` y `COMMIT`.
-3. No ejecutar seeds, `db reset`, ni volver a ejecutar las migraciones anteriores. Esta migración es para aplicarse una sola vez; Supabase local para pruebas se recrea únicamente en memoria.
-4. Verificar las seis tablas y el bucket privado `attendance-evidence` en Storage. El esquema `attendance_private` **no debe agregarse a Exposed Schemas**.
-5. Desplegar el código actualizado en el Vercel actual cuando se vaya a activar el módulo. Esta implementación no se publicó automáticamente.
+1. Revisar únicamente el archivo incremental completo. Esta entrega no lo ejecuta en Supabase remoto.
+2. Cuando se autorice su aplicación, ejecutar ese archivo una sola vez, incluyendo `BEGIN` y `COMMIT`, sobre la base que ya tiene el módulo original.
+3. No ejecutar la migración original, seeds ni `db reset`. Las pruebas usan una base PostgreSQL en memoria con datos históricos antes de aplicar la incremental.
+4. No se recrean tablas, esquema, bucket ni policies. `attendance_private` sigue sin exponerse en la API.
+5. Desplegar el código de accesos después de aplicar la incremental. Esta entrega no publica ni envía correos reales.
 
-Las tablas nuevas son `employees`, `attendance_schedules`, `attendance_records`, `attendance_imports`, `attendance_settings`, `attendance_audit_log`. Incluyen índices por fecha/empleado, claves foráneas, unicidad por empleado/fecha, restricciones de estado, horarios coherentes y timestamps. No se borran empleados ni horarios históricos desde la UI; personal se desactiva.
+### Comparación del esquema remoto y alcance incremental
+
+La consulta remota de solo lectura confirmó 3 empleados reales, la tolerancia individual, los turnos día/noche y el cierre exclusivo de día. La columna `invitation_email_status` no existe; `lookup_account` devuelve solo id/rol y faltan `access_statuses` e `invitation_email`. Las policies ya restringen administración a admin y lectura a employee sobre sus propios datos; warehouse no obtiene acceso administrativo.
+
+La incremental agrega solo `employees.invitation_email_status`, con `DEFAULT 'not_sent'`, `NOT NULL` y un CHECK de cuatro estados. Es metadata operativa necesaria para recordar el resultado del envío después de cerrar el modal. Para empleados anteriores, el valor inicial indica que el flujo nuevo no ha registrado un envío; no reconstruye correos históricos. No se agregan estados de activación, fechas duplicadas, links, tokens, OTP ni contraseñas a las tablas de asistencia.
+
+Se reemplazan únicamente la función privada del comando y su wrapper público, conservando firmas, propietarios, permisos, `search_path` y guardas de administrador. `lookup_account` obtiene indicadores de Auth sin devolver hashes; `access_statuses` calcula estados desde Auth; `invitation_email` guarda y audita solo el estado de entrega. El resto del cuerpo del comando conserva exactamente sus operaciones anteriores. No hacen falta nuevos índices, policies ni triggers: los existentes ya cubren el acceso y la vinculación.
+
+El ALTER no modifica códigos, profile_id, tolerancias, timestamps, horarios, asistencias, imports, fotos, secuencia ni auditoría existentes. Solo añade el valor por defecto a la nueva columna. La función `generateLink` sigue exclusivamente en el servidor con la clave administrativa; no requiere una función SQL ni persistencia del enlace.
+
+Las tablas nuevas son `employees`, `attendance_schedules`, `attendance_records`, `attendance_imports`, `attendance_settings`, `attendance_audit_log`. Incluyen índices por fecha/empleado, claves foráneas, unicidad por empleado/fecha/turno y por horario en asistencia, restricciones de estado, horarios coherentes y timestamps. No se borran empleados ni horarios históricos desde la UI; personal se desactiva.
 
 La migración amplía `profiles.role` con `employee`. **No cambia roles de cuentas existentes.** Las cuentas nuevas se crean como employee, ignorando cualquier rol en metadata; futuros usuarios de almacén requieren asignación explícita del rol warehouse por un administrador autorizado. Se conserva el perfil y su arquitectura.
 
@@ -43,18 +53,26 @@ SUPABASE_SERVICE_ROLE_KEY=<clave administrativa del proyecto actual>
 APP_URL=https://city-recepcion.vercel.app
 ```
 
-En desarrollo: `APP_URL=http://localhost:3000`. Nunca agregar `NEXT_PUBLIC_` a la clave administrativa ni compartirla con el navegador. Las lecturas, reportes y marcaciones utilizan el cliente autenticado normal; la clave administrativa solo se usa en el servidor para enviar una invitación Auth nueva.
+En desarrollo: `APP_URL=http://localhost:3000`. Nunca agregar `NEXT_PUBLIC_` a la clave administrativa ni compartirla con el navegador. Las lecturas, reportes y marcaciones utilizan el cliente autenticado normal; la clave administrativa solo se usa en el servidor para generar enlaces Auth y enviar correo cuando admin lo solicita.
 
 En Supabase Auth → URL Configuration, agregar los redirect URLs exactos:
 
 - `http://localhost:3000/auth/invitacion`
 - `https://city-recepcion.vercel.app/auth/invitacion`
 
-Si se usa otro dominio autorizado del deployment, configurar su APP_URL y redirect correspondiente. Para invitaciones reales, configurar el SMTP autorizado y sus límites de entrega. No se implementan WhatsApp/SMS.
+Si se usa otro dominio autorizado del deployment, configurar su APP_URL y redirect correspondiente. No se configura SMTP externo en esta entrega.
 
-Flujo: Personal → agregar nombre/cargo/correo → Enviar invitación. Se comprueba primero si Auth ya tiene ese correo. Una cuenta employee existente se vincula y utiliza su contraseña actual; no se duplica. Una cuenta nueva recibe el email de Supabase y elige su contraseña en `/auth/invitacion`. La vinculación se valida por correo y queda auditada. Una cuenta admin/warehouse no se convierte automáticamente: la UI pide usar un correo de empleado para evitar retirar permisos existentes por accidente.
+Flujo principal: Personal → Agregar empleado → Guardar y crear acceso → `auth.admin.generateLink({ type: "invite", email, options: {redirectTo, data: {full_name}} })` → modal Acceso creado. Generar el enlace no envía correo. Copiar enlace o WhatsApp funcionan sin SMTP. El administrador abre WhatsApp y confirma el envío allí; la aplicación no manda mensajes automáticamente. La contraseña se crea en `/auth/invitacion`.
 
-El jefe nunca define ni ve contraseñas. Si una invitación venció, usar el flujo de recuperación/reenvío de Auth hacia el redirect autorizado. La cuenta existente no debe recrearse.
+El botón Enviar por correo es opcional y hace un único intento mediante Supabase Auth. No hay reintentos automáticos; durante la solicitud se deshabilita y bloquea el doble clic. El límite temporal se traduce a español y conserva la cuenta, la vinculación y el enlace visible. El fallback Copiar/WhatsApp sigue disponible. Un envío exitoso de invitación puede reemplazar el token anterior en Supabase: el modal deja de ofrecer ese enlace antiguo. Si se genera otro después, se advierte expresamente que reemplaza el anterior, incluido el del correo.
+
+Se separan cuenta (Sin acceso / Invitación pendiente / Cuenta activada) y correo (No enviado / Enviado / Límite temporal alcanzado / Error de envío). El estado del correo se guarda en `employees.invitation_email_status` y se audita solo ese estado. Cuenta activada se calcula en PostgreSQL a partir de `auth.users.email_confirmed_at` y la existencia de contraseña, sin devolver hashes. Un fallo de email no activa ni desactiva cuentas.
+
+Una cuenta employee ya activada se vincula y utiliza su contraseña actual. No se generan enlaces de reinicio para ella. Una invitación pendiente permite Generar nuevo enlace con confirmación, solo admin. Si ya confirmó el enlace pero no terminó de establecer contraseña, Supabase requiere generar un enlace de recuperación en lugar de otra invitación; se usa Auth y la misma pantalla. Nunca se inventan tokens. Cuentas admin/warehouse no se convierten en empleados.
+
+El `action_link` se devuelve únicamente al administrador autenticado que lo pidió y vive en el estado del modal. No se guarda en localStorage, base de datos, auditoría, imports, logs, analytics ni reportes. Al cerrar el modal se descarta. No se enviaron correos reales durante pruebas.
+
+Si City Ofertas necesita muchas invitaciones o recuperaciones por correo, se podrá configurar SMTP propio en Supabase Auth en una fase posterior. El flujo Generate Link → WhatsApp/Copiar ya permite operar sin ese servicio.
 
 ## Personal y horarios
 
@@ -109,7 +127,7 @@ Reportes usa el mismo cliente autenticado bajo RLS. Admin exporta un día/perío
 1. Aplicar el SQL nuevo manualmente y configurar variables/redirects como se indicó; iniciar el proyecto con `npm run dev`.
 2. Entrar con **el admin existente**. El portal debe mostrar ambos módulos. Abrir Control de asistencia → Personal.
 3. Agregar `Prueba Puntual` y `Prueba Tarde`, con dos correos reales distintos a los que puedas acceder, cargo `Prueba` y motivo `Prueba de módulo`. Anotar sus códigos EMP; no crear ni compartir contraseñas desde administración.
-4. Enviar invitación a ambas fichas, abrir cada email en una sesión separada y crear la contraseña propia. Si ya existía una cuenta employee con ese correo, usar su contraseña actual tras vincularla.
+4. Generar el acceso de ambas fichas, copiar/compartir por WhatsApp el enlace, abrirlo en una sesión separada y crear la contraseña propia. Opcionalmente probar el envío explícito por correo. Si ya existía una cuenta employee con ese correo, usar su contraseña actual tras vincularla.
 5. Admin → Horarios: asignar **la fecha actual de Perú** a ambos. Para Prueba Puntual, programar aproximadamente 5 minutos después de la hora actual; para Prueba Tarde, aproximadamente 20 minutos antes. Evitar probar cerca de medianoche. Motivo `Prueba de puntualidad`.
 6. En el celular (HTTPS del deployment para cámara) o navegador con carga de imagen, entrar como Prueba Puntual. Debe ir a `/asistencia`; tomar/subir foto, revisar y confirmar. Esperar estado Puntual y hora del servidor.
 7. Entrar como Prueba Tarde en otro navegador/sesión. Marcar con otra foto. Debe aparecer Tarde, aproximadamente 20 minutos según cuánto demoró la prueba.
@@ -152,8 +170,10 @@ Sin dependencias nuevas. Se reutilizan Supabase SSR/js, XLSX, jsPDF/AutoTable, R
 
 ## Verificación
 
-Las pruebas de asistencia usan PostgreSQL PGlite efímero, roles/RLS reales y un esquema Storage local equivalente para verificar políticas. No utilizan credenciales ni conectan a Supabase remoto. No se enviaron invitaciones reales; ese recorrido depende de SMTP/configuración y debe probarse manualmente con los dos correos.
+Las pruebas de asistencia usan PostgreSQL PGlite efímero, roles/RLS reales y un esquema Storage local equivalente para verificar políticas. No utilizan credenciales ni conectan a Supabase remoto. No se enviaron invitaciones reales; el recorrido real de Auth requiere la configuración del servidor y Redirect URLs, y debe probarse manualmente con los dos empleados. Copiar/WhatsApp no requieren SMTP.
 
 Los casos cubren aislamiento, puntualidad, tardanza, descanso, doble marcación, fechas independientes, Excel/fechas/horas/descanso, tildes, nombres ambiguos, escrituras prohibidas, warehouse, fotos privadas/propiedad, reportes bajo RLS, auditoría, rollback, idempotencia, cambios posteriores a preview, tolerancia exacta, evidencia histórica, recepción compatible, secuencia y roles sin metadata.
 
-Resultados: `npm run lint` aprobado sin errores ni warnings; `npx tsc --noEmit` aprobado; `npm test` **96/96** (53 mercadería + 43 asistencia); `npm run build` aprobado. Se conserva el aviso previo de Next.js sobre deprecación de `middleware`.
+Resultados: `npm run lint` aprobado sin errores ni warnings; `npx tsc --noEmit` aprobado; `npm test` **117/117** (53 mercadería + 64 asistencia/invitaciones/migración incremental); `npm run build` aprobado. Se conserva el aviso previo de Next.js sobre deprecación de `middleware`.
+
+La prueba incremental aplica primero el módulo original, crea empleados vinculados y sin cuenta, horarios día/noche, importación, marcación con evidencia y auditoría, y solo entonces aplica el SQL nuevo. Compara datos completos antes/después (incluyendo Auth, secuencia y Storage), policies, permisos y propiedades/OIDs de funciones. También verifica estados derivados de Auth y denegación de comandos a employee/warehouse/anon. Las pruebas de generateLink y correo usan adaptadores de Auth simulados; no se ejecutó GoTrue local, no se generó una invitación real ni se envió correo remoto.

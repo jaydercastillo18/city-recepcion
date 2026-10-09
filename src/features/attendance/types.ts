@@ -11,6 +11,8 @@ export interface Employee {
   phone: string | null;
   active: boolean;
   late_tolerance_minutes: number;
+  invitation_email_status: import("./invitations").EmailState;
+  access_status?: import("./invitations").AccountState;
   created_at: string;
   updated_at: string;
 }
