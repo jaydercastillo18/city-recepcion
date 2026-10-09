@@ -1,0 +1,102 @@
+import type {
+  AttendanceData,
+  Employee,
+} from "../../src/features/attendance/types";
+export function attendanceUiFixture(): AttendanceData {
+  const employees: Employee[] = [
+    {
+      id: "fixture-1",
+      profile_id: "account-1",
+      employee_code: "EMP-0001",
+      full_name: "Harrison Calderon",
+      position: "Aux. de Reposición",
+      email: "harrison@example.invalid",
+      phone: "923 425 372",
+      active: true,
+      access_status: "activated",
+      late_tolerance_minutes: 5,
+    },
+    {
+      id: "fixture-2",
+      profile_id: "account-2",
+      employee_code: "EMP-0002",
+      full_name: "Micaela Ruiz",
+      position: "Caja",
+      email: "micaela@example.invalid",
+      phone: "943 213 891",
+      active: true,
+      access_status: "pending",
+      late_tolerance_minutes: 10,
+    },
+    {
+      id: "fixture-3",
+      profile_id: null,
+      employee_code: "EMP-0003",
+      full_name: "Carlos Ruiz",
+      position: "Almacén",
+      email: "carlos@example.invalid",
+      phone: null,
+      active: true,
+      access_status: "no_access",
+      late_tolerance_minutes: 0,
+    },
+    {
+      id: "fixture-4",
+      profile_id: null,
+      employee_code: "EMP-0004",
+      full_name: "Lucía Torres",
+      position: "Caja",
+      email: "lucia@example.invalid",
+      phone: null,
+      active: false,
+      access_status: "no_access",
+      late_tolerance_minutes: 15,
+      suspended_at: "2026-10-08T12:00:00Z",
+    },
+  ].map(
+    (e) =>
+      ({
+        ...e,
+        normalized_name: e.full_name.toUpperCase(),
+        invitation_email_status: "not_sent",
+        created_at: "2026-10-01T12:00:00Z",
+        updated_at: "2026-10-08T12:00:00Z",
+      }) as Employee,
+  );
+  return {
+    employees,
+    serverNow: "2026-10-09T16:00:00Z",
+    from: "2026-10-01",
+    to: "2026-10-09",
+    settings: { id: 1, absence_cutoff_minutes: 180, updated_at: "" },
+    schedules: employees.map((e, i) => ({
+      id: `schedule-${i}`,
+      employee_id: e.id,
+      work_date: "2026-10-09",
+      shift: i === 3 ? "night" : "day",
+      scheduled_time: i === 3 ? "20:00:00" : "10:00:00",
+      is_day_off: false,
+      source_import_id: null,
+      created_at: "",
+      updated_at: "",
+    })),
+    records: employees
+      .slice(0, 2)
+      .map((e, i) => ({
+        id: `record-${i}`,
+        employee_id: e.id,
+        schedule_id: `schedule-${i}`,
+        work_date: "2026-10-09",
+        scheduled_time: "10:00:00",
+        check_in_at: i === 0 ? "2026-10-09T14:59:00Z" : "2026-10-09T15:13:00Z",
+        status: i === 0 ? "on_time" : "late",
+        minutes_late: i === 0 ? 0 : 13,
+        tolerance_minutes_applied: e.late_tolerance_minutes,
+        photo_storage_path: null,
+        notes: null,
+        registered_by: e.profile_id,
+        created_at: "",
+        updated_at: "",
+      })),
+  };
+}

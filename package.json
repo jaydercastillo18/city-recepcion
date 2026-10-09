@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "npm run test:import && npm run test:attendance",
-    "test:attendance": "tsx --test tests/attendance.test.ts tests/attendance-invitations.test.ts tests/attendance-access-migration.test.ts",
+    "test:attendance": "tsx --test tests/attendance.test.ts tests/attendance-invitations.test.ts tests/attendance-access-migration.test.ts tests/attendance-personnel.test.ts tests/password-recovery.test.ts",
     "test:import": "tsx --test tests/import-parser.test.ts tests/import-transaction.test.ts tests/import-pagination.test.ts tests/import-origin.test.ts"
   },
   "dependencies": {

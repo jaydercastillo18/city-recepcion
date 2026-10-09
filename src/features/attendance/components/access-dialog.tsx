@@ -10,6 +10,7 @@ import {
   type EmailState,
 } from "../invitations";
 import type { Employee } from "../types";
+import RecoveryControls from "./recovery-controls";
 export const ACCOUNT_LABEL = {
   no_access: "Sin acceso",
   pending: "Invitación pendiente",
@@ -42,6 +43,7 @@ export default function AccessDialog({
   const [confirm, setConfirm] = useState(false),
     [copyMessage, setCopyMessage] = useState("");
   const [busy, start] = useTransition();
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
   const lock = useRef(false);
   const router = useRouter();
   const account =
@@ -95,25 +97,27 @@ export default function AccessDialog({
     <Dialog.Root
       open
       onOpenChange={(open) => {
-        if (!open && !busy) onClose();
+        if (!open && !busy && !recoveryBusy) onClose();
       }}
     >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/70 z-50" />
         <Dialog.Content
-          className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-lg max-h-[90dvh] overflow-y-auto card-base p-6 space-y-4"
+          className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-lg max-h-[90dvh] overflow-y-auto attendance-dialog rounded-2xl p-6 space-y-4"
           onEscapeKeyDown={(event) => {
-            if (busy) event.preventDefault();
+            if (busy || recoveryBusy) event.preventDefault();
           }}
           onInteractOutside={(event) => {
-            if (busy) event.preventDefault();
+            if (busy || recoveryBusy) event.preventDefault();
           }}
         >
           <Dialog.Title className="text-xl font-bold">
-            {account === "no_access" ? "Crear acceso" : "✅ Acceso creado"}
+            Gestionar acceso
           </Dialog.Title>
           <Dialog.Description>
-            Comparte el acceso personal para que el empleado cree su contraseña.
+            {account === "activated"
+              ? "La cuenta ya está activada. El empleado conserva su contraseña actual."
+              : "Comparte el acceso personal para que el empleado cree su contraseña."}
           </Dialog.Description>
           <div>
             <h2 className="font-bold text-lg">{employee.full_name}</h2>
@@ -122,7 +126,14 @@ export default function AccessDialog({
             <p>Teléfono: {employee.phone || "Sin teléfono"}</p>
           </div>
           <div className="text-sm">
-            <p>Estado de cuenta: {ACCOUNT_LABEL[account]}</p>
+            <p className="mb-3">
+              Estado de cuenta:{" "}
+              <span
+                className={`attendance-badge ${account === "activated" ? "green" : account === "pending" ? "amber" : "neutral"}`}
+              >
+                {ACCOUNT_LABEL[account]}
+              </span>
+            </p>
             <p>
               Estado del correo:{" "}
               {
@@ -151,7 +162,7 @@ export default function AccessDialog({
               WhatsApp.
             </p>
           )}
-          {access.actionLink && (
+          {account !== "activated" && access.actionLink && (
             <div className="space-y-3">
               <button
                 type="button"
@@ -258,7 +269,8 @@ export default function AccessDialog({
               )}
             </div>
           )}
-          <Dialog.Close className="btn-ghost w-full" disabled={busy}>
+          {account === "activated" && <RecoveryControls employee={employee} onBusy={setRecoveryBusy} />}
+          <Dialog.Close className="btn-ghost w-full" disabled={busy || recoveryBusy}>
             Cerrar
           </Dialog.Close>
         </Dialog.Content>

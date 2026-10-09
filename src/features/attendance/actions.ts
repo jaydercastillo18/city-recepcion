@@ -197,6 +197,22 @@ export async function inviteEmployee(
       await invitationPorts(),
       employeeId,
     );
+    if (result.actionLink && !result.error) {
+      const { client } = await attendanceSession(true);
+      const audit = await client.rpc("attendance_employee_command", {
+        p_action: "access_generated",
+        p_data: {
+          id: employeeId,
+          reason: "Generación administrativa de acceso",
+        },
+      });
+      if (audit.error)
+        return {
+          ...result,
+          message:
+            "El acceso se generó y puedes compartirlo. No se pudo registrar la auditoría de generación; verifica la migración de personal antes de continuar administrando accesos.",
+        };
+    }
     revalidatePath("/admin/asistencia/personal");
     return result;
   } catch (error) {
@@ -222,6 +238,38 @@ export async function sendInvitationEmail(
         error instanceof AccessOperationError
           ? error.message
           : "No se pudo enviar el correo. Verifica tus permisos e intenta más tarde.",
+    };
+  }
+}
+
+export async function employeeLifecycle(form: FormData) {
+  try {
+    const { client } = await attendanceSession(true);
+    const action = text(form, "action");
+    if (!["suspend", "reactivate", "archive"].includes(action))
+      return { error: "Acción no permitida." };
+    const result = await client.rpc("attendance_employee_command", {
+      p_action: action,
+      p_data: {
+        id: text(form, "id"),
+        reason: text(form, "reason"),
+        confirmation: text(form, "confirmation"),
+      },
+    });
+    if (result.error)
+      return {
+        error:
+          result.error.code === "PGRST202"
+            ? "Aplica la migración incremental de personal para habilitar esta acción."
+            : result.error.message,
+      };
+    revalidatePath("/admin/asistencia", "layout");
+    revalidatePath("/asistencia");
+    return { success: true };
+  } catch {
+    return {
+      error:
+        "No se pudo actualizar el empleado. Verifica tus permisos e intenta nuevamente.",
     };
   }
 }

@@ -268,6 +268,10 @@ export interface Database {
         Args: { p_photo_path: string; p_schedule_id?: string | null };
         Returns: Json;
       };
+      attendance_employee_command: {
+        Args: { p_action: string; p_data: Json };
+        Returns: Json;
+      };
       attendance_server_now: { Args: Record<string, never>; Returns: string };
       finalize_shipment_admin: {
         Args: {

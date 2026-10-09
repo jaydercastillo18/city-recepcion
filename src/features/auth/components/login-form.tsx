@@ -3,6 +3,7 @@
 // CITY RECEPCIÓN - Formulario de Login
 // ============================================================
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 import { loginAction } from '@/features/auth/actions';
 import CityBrand from '@/components/layout/city-brand';
@@ -142,6 +143,10 @@ export default function LoginForm() {
           )}
         </button>
       </form>
+
+      <Link href="/auth/recuperar" className="btn-ghost w-full mt-4">
+        ¿Olvidaste tu contraseña?
+      </Link>
 
       {/* Footer */}
       <p className="text-center text-xs text-slate-600 mt-6">

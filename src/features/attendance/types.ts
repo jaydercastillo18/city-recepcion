@@ -1,5 +1,10 @@
 export type AttendanceStatus =
-  "pending" | "on_time" | "late" | "absent" | "day_off" | "justified";
+  | "pending"
+  | "on_time"
+  | "late"
+  | "absent"
+  | "day_off"
+  | "justified";
 export interface Employee {
   id: string;
   profile_id: string | null;
@@ -10,6 +15,8 @@ export interface Employee {
   email: string | null;
   phone: string | null;
   active: boolean;
+  suspended_at?: string | null;
+  archived_at?: string | null;
   late_tolerance_minutes: number;
   invitation_email_status: import("./invitations").EmailState;
   access_status?: import("./invitations").AccountState;

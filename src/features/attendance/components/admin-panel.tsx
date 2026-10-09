@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Settings from "./settings";
+import ReportDashboard from "./report-dashboard";
 import RefreshClock from "./refresh-clock";
 import type { AttendanceData, AuditLog } from "../types";
 import { attendanceRows, limaDate } from "../domain";
@@ -7,11 +9,7 @@ import AttendanceList from "./attendance-list";
 import Personal from "./personal";
 import ScheduleImport from "./schedule-import";
 import MutationForm from "./mutation-form";
-import {
-  saveSchedule,
-  saveAttendanceSettings,
-  closeAttendanceDay,
-} from "../actions";
+import { saveSchedule, closeAttendanceDay } from "../actions";
 export function PeriodFilter({ from, to }: { from: string; to: string }) {
   return (
     <form className="flex flex-wrap items-end gap-3 mb-6">
@@ -43,108 +41,40 @@ export default function AdminPanel({
   section,
   data,
   audit = [],
+  dailyData,
 }: {
   section: string;
   data: AttendanceData;
   audit?: AuditLog[];
+  dailyData?: AttendanceData;
 }) {
   const today = limaDate(new Date(data.serverNow)),
     rows = attendanceRows(data);
-  if (section === "personal") return <Personal employees={data.employees} />;
-  if (section === "importar") return <ScheduleImport />;
-  if (section === "configuracion")
+  if (section === "personal")
     return (
-      <section className="card-base p-6 max-w-xl">
-        <h2 className="text-lg font-bold mb-4">Hora límite de asistencia</h2>
-        <p className="text-sm text-slate-400 mb-4">
-          La tolerancia se configura individualmente en Personal.
-        </p>
-        <MutationForm action={saveAttendanceSettings}>
-          <label className="block">
-            Hora límite después de la entrada (minutos)
-            <input
-              name="absence_cutoff_minutes"
-              type="number"
-              min={1}
-              max={1440}
-              defaultValue={data.settings.absence_cutoff_minutes}
-              required
-              className="import-input"
-            />
-          </label>
-          <p className="text-sm text-slate-400">
-            Antes del límite permanece pendiente; después aparece falta. El
-            cierre administrativo guarda el registro y su auditoría. Todo se
-            calcula con hora de Perú.
-          </p>
-          <label className="block">
-            Motivo
-            <input
-              name="reason"
-              minLength={3}
-              maxLength={2000}
-              required
-              className="import-input"
-            />
-          </label>
-        </MutationForm>
-      </section>
+      <Personal
+        employees={data.employees}
+        attendedToday={
+          new Set(
+            rows
+              .filter(
+                (r) =>
+                  r.schedule.work_date === today &&
+                  r.schedule.shift === "day" &&
+                  ["on_time", "late"].includes(r.status),
+              )
+              .map((r) => r.employee.id),
+          ).size
+        }
+      />
     );
+  if (section === "importar") return <ScheduleImport />;
+  if (section === "configuracion") return <Settings settings={data.settings} />;
   if (section === "reportes")
     return (
       <div>
         <PeriodFilter from={data.from} to={data.to} />
-        <Summary rows={rows} />
-        <div className="card-base p-6 space-y-4">
-          <h2 className="font-bold">Reportes del período</h2>
-          <div className="flex flex-wrap gap-3">
-            <a
-              className="btn-primary"
-              href={`/api/asistencia/report?format=pdf&from=${data.from}&to=${data.to}`}
-            >
-              PDF del período
-            </a>
-            <a
-              className="btn-ghost"
-              href={`/api/asistencia/report?format=excel&from=${data.from}&to=${data.to}`}
-            >
-              Excel mensual / período
-            </a>
-            <a
-              className="btn-ghost"
-              href={`/api/asistencia/report?format=pdf&from=${today}&to=${today}`}
-            >
-              PDF de hoy
-            </a>
-          </div>
-          <h3 className="font-bold pt-4">Por empleado</h3>
-          <div className="space-y-2">
-            {data.employees.map((e) => (
-              <div
-                key={e.id}
-                className="flex flex-wrap justify-between gap-2 border-t border-purple-900 py-3"
-              >
-                <span>
-                  {e.employee_code} · {e.full_name}
-                </span>
-                <div className="flex gap-3">
-                  <a
-                    href={`/api/asistencia/report?format=pdf&from=${data.from}&to=${data.to}&employee=${e.id}`}
-                    className="text-purple-300 underline"
-                  >
-                    PDF
-                  </a>
-                  <a
-                    href={`/api/asistencia/report?format=excel&from=${data.from}&to=${data.to}&employee=${e.id}`}
-                    className="text-purple-300 underline"
-                  >
-                    Excel
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ReportDashboard data={data} dailyData={dailyData} />
       </div>
     );
   if (section === "horarios")
@@ -217,7 +147,7 @@ export default function AdminPanel({
             </MutationForm>
           </div>
         </details>
-        <AttendanceList rows={rows} admin />
+        <AttendanceList rows={rows} admin mode="schedule" />
       </div>
     );
   if (section === "historial")
@@ -225,7 +155,7 @@ export default function AdminPanel({
       <div className="space-y-6">
         <PeriodFilter from={data.from} to={data.to} />
         <Summary rows={rows} />
-        <AttendanceList rows={rows.toReversed()} admin />
+        <AttendanceList rows={rows.toReversed()} admin mode="history" />
         <details className="card-base p-5">
           <summary className="font-bold cursor-pointer">
             Auditoría de cambios
@@ -271,10 +201,10 @@ export default function AdminPanel({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-bold text-lg">Hoy · {today}</h2>
+        <h2 className="font-bold text-lg">Asistencia de hoy · {today}</h2>
         <RefreshClock />
       </div>
-      <Summary rows={daily} />
+      <Summary rows={daily} compact />
       <AttendanceList rows={daily} admin />
       <details className="card-base p-5">
         <summary className="font-bold cursor-pointer text-amber-200 py-2">

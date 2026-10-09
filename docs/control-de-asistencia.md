@@ -2,13 +2,15 @@
 
 ## Arquitectura y estado de entrega
 
-Se implementaron las fases A–E en el proyecto Next.js existente, usando el mismo Supabase Auth, las mismas cookies y el mismo despliegue. No se crearon proyectos externos, no se enviaron correos de prueba y no se ejecutó SQL remoto. La migración original `20261009001046_attendance_module.sql` ya está aplicada en Supabase remoto y existen empleados reales. No debe volver a ejecutarse. Los cambios nuevos de acceso requieren únicamente la migración incremental descrita abajo.
+Se implementaron las fases A–E en el proyecto Next.js existente, usando el mismo Supabase Auth, las mismas cookies y el mismo despliegue. No se crearon proyectos externos, no se enviaron correos de prueba y no se ejecutó SQL remoto. La migración original `20261009001046_attendance_module.sql` ya está aplicada en Supabase remoto y existen empleados reales. No debe volver a ejecutarse. La migración de enlaces `20261009025154_attendance_access_links.sql` también está aplicada, según la inspección remota del 9 de octubre. El rediseño y ciclo de vida de personal se describen en [attendance-redesign.md](attendance-redesign.md); únicamente la nueva migración de personal está pendiente.
 
 El portal `/` dirige a admin a dos módulos, a employee a `/asistencia` y a warehouse a recepción. Administración de asistencia usa `/admin/asistencia` con Hoy, Personal, Horarios, Importar Excel, Historial, Reportes y Configuración. Se conserva el branding, header y fondo existente.
 
 ## SQL exacto y aplicación manual
 
-La migración original se conserva idéntica a la versión aplicada. SQL incremental completo: [`20261009025154_attendance_access_links.sql`](../supabase/migrations/20261009025154_attendance_access_links.sql).
+La migración original se conserva idéntica a la versión aplicada. SQL de enlaces ya aplicado: [`20261009025154_attendance_access_links.sql`](../supabase/migrations/20261009025154_attendance_access_links.sql). **No volver a ejecutarlo.**
+
+SQL incremental de personal pendiente: [`20261009211607_attendance_personnel_lifecycle.sql`](../supabase/migrations/20261009211607_attendance_personnel_lifecycle.sql). Las instrucciones siguientes se refieren solo a este archivo nuevo.
 
 1. Revisar únicamente el archivo incremental completo. Esta entrega no lo ejecuta en Supabase remoto.
 2. Cuando se autorice su aplicación, ejecutar ese archivo una sola vez, incluyendo `BEGIN` y `COMMIT`, sobre la base que ya tiene el módulo original.
@@ -16,7 +18,7 @@ La migración original se conserva idéntica a la versión aplicada. SQL increme
 4. No se recrean tablas, esquema, bucket ni policies. `attendance_private` sigue sin exponerse en la API.
 5. Desplegar el código de accesos después de aplicar la incremental. Esta entrega no publica ni envía correos reales.
 
-### Comparación del esquema remoto y alcance incremental
+### Comparación previa del esquema y cambios de acceso ya aplicados
 
 La consulta remota de solo lectura confirmó 3 empleados reales, la tolerancia individual, los turnos día/noche y el cierre exclusivo de día. La columna `invitation_email_status` no existe; `lookup_account` devuelve solo id/rol y faltan `access_statuses` e `invitation_email`. Las policies ya restringen administración a admin y lectura a employee sobre sus propios datos; warehouse no obtiene acceso administrativo.
 
@@ -174,6 +176,6 @@ Las pruebas de asistencia usan PostgreSQL PGlite efímero, roles/RLS reales y un
 
 Los casos cubren aislamiento, puntualidad, tardanza, descanso, doble marcación, fechas independientes, Excel/fechas/horas/descanso, tildes, nombres ambiguos, escrituras prohibidas, warehouse, fotos privadas/propiedad, reportes bajo RLS, auditoría, rollback, idempotencia, cambios posteriores a preview, tolerancia exacta, evidencia histórica, recepción compatible, secuencia y roles sin metadata.
 
-Resultados: `npm run lint` aprobado sin errores ni warnings; `npx tsc --noEmit` aprobado; `npm test` **117/117** (53 mercadería + 64 asistencia/invitaciones/migración incremental); `npm run build` aprobado. Se conserva el aviso previo de Next.js sobre deprecación de `middleware`.
+Resultados: `npm run lint` aprobado sin errores ni warnings; `npx tsc --noEmit` aprobado; `npm test` **132/132** (53 mercadería + 79 asistencia/invitaciones/migraciones/personal); `npm run build` aprobado. Se conserva el aviso previo de Next.js sobre deprecación de `middleware`.
 
 La prueba incremental aplica primero el módulo original, crea empleados vinculados y sin cuenta, horarios día/noche, importación, marcación con evidencia y auditoría, y solo entonces aplica el SQL nuevo. Compara datos completos antes/después (incluyendo Auth, secuencia y Storage), policies, permisos y propiedades/OIDs de funciones. También verifica estados derivados de Auth y denegación de comandos a employee/warehouse/anon. Las pruebas de generateLink y correo usan adaptadores de Auth simulados; no se ejecutó GoTrue local, no se generó una invitación real ni se envió correo remoto.

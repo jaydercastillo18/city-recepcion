@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { readAllRows } from "@/lib/supabase/read-all-rows";
+import { canEnterAttendance } from "./personnel";
 import { limaDate } from "./domain";
 import type { AttendanceData } from "./types";
 export async function attendanceSession(adminOnly = false) {
@@ -22,6 +23,17 @@ export async function attendanceSession(adminOnly = false) {
       : !["admin", "employee"].includes(profile.role))
   )
     throw new Error("No tienes permiso para este módulo.");
+  if (profile.role === "employee") {
+    const result = await client
+      .from("employees")
+      .select("active")
+      .eq("profile_id", user.id)
+      .maybeSingle();
+    if (result.error || !canEnterAttendance(result.data))
+      throw new Error(
+        "Tu acceso está suspendido, archivado o pendiente de vinculación. Contacta al administrador.",
+      );
+  }
   return { client, user, profile };
 }
 export function dateRange(from: string, to: string) {

@@ -5,6 +5,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import type { AttendanceRow } from "../types";
 import { STATUS, ROW_STATUS, limaTime, shiftLabel } from "../domain";
 import { correctAttendance } from "../actions";
+import { EmployeeAvatar, AttendanceToolbar } from "./ui";
+import { normalizeName } from "../domain";
 import MutationForm from "./mutation-form";
 export function Evidence({ recordId }: { recordId: string }) {
   const [open, setOpen] = useState(false),
@@ -171,97 +173,222 @@ function Correction({ row }: { row: AttendanceRow }) {
 export default function AttendanceList({
   rows,
   admin = false,
+  mode = "attendance",
 }: {
   rows: AttendanceRow[];
   admin?: boolean;
+  mode?: "attendance" | "schedule" | "history";
 }) {
   const [query, setQuery] = useState(""),
-    [status, setStatus] = useState("all");
+    [status, setStatus] = useState("all"),
+    [shift, setShift] = useState("all"),
+    [date, setDate] = useState("");
   const visible = rows.filter(
     (row) =>
       (status === "all" || row.status === status) &&
-      `${row.employee.full_name} ${row.employee.employee_code}`
-        .toLocaleLowerCase()
-        .includes(query.toLocaleLowerCase()),
+      (shift === "all" || row.schedule.shift === shift) &&
+      (!date || row.schedule.work_date === date) &&
+      normalizeName(
+        `${row.employee.full_name} ${row.employee.employee_code}`,
+      ).includes(normalizeName(query)),
+  );
+  const badge = (row: AttendanceRow) => (
+    <span
+      className={`attendance-badge ${row.status === "on_time" ? "green" : row.status === "late" ? "amber" : row.status === "absent" ? "red" : "neutral"}`}
+    >
+      {ROW_STATUS[row.status].label}
+    </span>
+  );
+  const actions = (row: AttendanceRow) => (
+    <div className="flex gap-2 flex-wrap">
+      {row.record?.photo_storage_path && <Evidence recordId={row.record.id} />}{" "}
+      {admin && row.schedule.shift === "day" && mode !== "schedule" && (
+        <Correction row={row} />
+      )}
+    </div>
   );
   return (
-    <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row gap-3">
-        <label className="flex-1">
+    <div>
+      <AttendanceToolbar>
+        <label>
           Buscar empleado
           <input
+            placeholder="Nombre o código…"
             className="import-input"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
           />
+        </label>
+        <label>
+          Fecha
+          <input
+            type="date"
+            className="import-input"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
+        </label>
+        <label>
+          Turno
+          <select
+            className="import-input"
+            value={shift}
+            onChange={(e) => setShift(e.target.value)}
+          >
+            <option value="all">Todos</option>
+            <option value="day">Turno día</option>
+            <option value="night">Turno noche</option>
+          </select>
         </label>
         <label>
           Estado
           <select
             className="import-input"
             value={status}
-            onChange={(event) => setStatus(event.target.value)}
+            onChange={(e) => setStatus(e.target.value)}
           >
             <option value="all">Todos</option>
-            {Object.entries(ROW_STATUS).map(([key, value]) => (
-              <option key={key} value={key}>
-                {value.label}
+            {Object.entries(ROW_STATUS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v.label}
               </option>
             ))}
           </select>
         </label>
-      </div>
-      {visible.map((row) => (
-        <article
-          key={row.schedule.id}
-          className="card-base p-5 flex flex-col sm:flex-row justify-between gap-4"
+      </AttendanceToolbar>
+      <div className="attendance-table-wrap attendance-desktop">
+        <table
+          className={`attendance-table attendance-list-table mode-${mode}`}
         >
-          <div>
-            <p className="text-xs text-fuchsia-300">
-              {row.schedule.work_date} · {shiftLabel(row.schedule.shift)} ·{" "}
-              {row.employee.employee_code}
+          <caption className="sr-only">
+            {mode === "schedule"
+              ? "Horarios del personal"
+              : "Registros de asistencia"}
+          </caption>
+          <thead>
+            <tr>
+              {[
+                "Empleado",
+                "Fecha / turno",
+                "Horario",
+                ...(mode === "schedule" ? [] : ["Llegada", "Tolerancia"]),
+                "Estado",
+                ...(mode === "history" ? ["Min. tarde", "Observación"] : []),
+                ...(mode === "schedule" ? [] : ["Foto / acciones"]),
+              ].map((x) => (
+                <th scope="col" key={x}>
+                  {x}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((row) => (
+              <tr key={row.schedule.id}>
+                <td>
+                  <div className="flex gap-3 items-center">
+                    <EmployeeAvatar name={row.employee.full_name} />
+                    <div>
+                      <p className="font-semibold">{row.employee.full_name}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {row.employee.employee_code}
+                      </p>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <p>{row.schedule.work_date}</p>
+                  <p className="text-[10px] text-purple-300 mt-1">
+                    {row.schedule.shift === "night"
+                      ? "☾ Turno noche"
+                      : "Turno día"}
+                  </p>
+                </td>
+                <td>
+                  {row.schedule.scheduled_time?.slice(0, 5) ?? "Descanso"}
+                </td>
+                {mode !== "schedule" && (
+                  <>
+                    <td>
+                      {row.schedule.shift === "day"
+                        ? limaTime(row.record?.check_in_at ?? null)
+                        : "—"}
+                    </td>
+                    <td>
+                      {row.schedule.shift === "day"
+                        ? `${row.record?.tolerance_minutes_applied ?? row.employee.late_tolerance_minutes} min`
+                        : "—"}
+                    </td>
+                  </>
+                )}
+                <td>{badge(row)}</td>
+                {mode === "history" && (
+                  <>
+                    <td>
+                      {row.schedule.shift === "day" ? row.minutesLate : "—"}
+                    </td>
+                    <td className="max-w-40 break-words">
+                      {row.record?.notes || "—"}
+                    </td>
+                  </>
+                )}
+                {mode !== "schedule" && <td>{actions(row)}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="attendance-mobile">
+        {visible.map((row) => (
+          <article className="attendance-panel p-5" key={row.schedule.id}>
+            <div className="flex items-center gap-3">
+              <EmployeeAvatar name={row.employee.full_name} />
+              <div>
+                <h3 className="font-semibold">{row.employee.full_name}</h3>
+                <p className="text-xs text-slate-400">
+                  {row.employee.employee_code}
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-purple-300 my-3">
+              {row.schedule.work_date} · {shiftLabel(row.schedule.shift)}
             </p>
-            <h3 className="font-bold">{row.employee.full_name}</h3>
-            <p className="text-sm text-slate-400">
-              {row.employee.position} · Programado{" "}
-              {row.schedule.scheduled_time?.slice(0, 5) ?? "Descanso"}
-              {row.schedule.shift === "day" && (
-                <> · Entrada {limaTime(row.record?.check_in_at ?? null)}</>
+            <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+              <p className="text-slate-400">
+                Programado
+                <br />
+                <strong className="text-slate-200">
+                  {row.schedule.scheduled_time?.slice(0, 5) ?? "Descanso"}
+                </strong>
+              </p>
+              {mode !== "schedule" && row.schedule.shift === "day" && (
+                <p className="text-slate-400">
+                  Entrada
+                  <br />
+                  <strong className="text-slate-200">
+                    {limaTime(row.record?.check_in_at ?? null)}
+                  </strong>
+                </p>
               )}
-            </p>
-            <p
-              className={`text-sm font-semibold mt-2 ${ROW_STATUS[row.status].color}`}
-            >
-              {ROW_STATUS[row.status].icon} {ROW_STATUS[row.status].label}
-              {row.minutesLate > 0 ? ` · ${row.minutesLate} min` : ""}
-            </p>
-            {row.record && (
-              <p className="text-xs text-purple-200 mt-1">
-                Tolerancia aplicada: {row.record.tolerance_minutes_applied}{" "}
-                minutos
+            </div>
+            {badge(row)}
+            {row.schedule.shift === "day" && mode !== "schedule" && (
+              <p className="text-xs text-slate-400 my-3">
+                Tolerancia aplicada:{" "}
+                {row.record?.tolerance_minutes_applied ??
+                  row.employee.late_tolerance_minutes}{" "}
+                min · Tarde: {row.minutesLate} min
               </p>
             )}
             {row.record?.notes && (
-              <p className="text-sm text-slate-300 mt-1 whitespace-pre-wrap">
-                {row.record.notes}
-              </p>
+              <p className="text-sm my-3">{row.record.notes}</p>
             )}
-            {row.status === "absent" && !row.record && (
-              <p className="text-xs text-slate-500 mt-1">
-                Hora límite superada; pendiente de cierre administrativo.
-              </p>
-            )}
-          </div>
-          <div className="flex gap-2 items-start flex-wrap">
-            {row.record?.photo_storage_path && (
-              <Evidence recordId={row.record.id} />
-            )}
-            {admin && row.schedule.shift === "day" && <Correction row={row} />}
-          </div>
-        </article>
-      ))}
+            {mode !== "schedule" && <div className="mt-4">{actions(row)}</div>}
+          </article>
+        ))}
+      </div>
       {!visible.length && (
-        <p className="card-base p-8 text-slate-400">
+        <p className="attendance-empty">
           No hay registros para este período y filtro.
         </p>
       )}

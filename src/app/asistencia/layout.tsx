@@ -1,3 +1,4 @@
+import "@/features/attendance/attendance.css";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/features/auth/actions";
@@ -24,7 +25,7 @@ export default async function AttendanceLayout({
         userName={auth.profile.full_name ?? ""}
         userRole={auth.profile.role}
       />
-      <main className="max-w-4xl mx-auto p-4 py-6 shipment-scene">
+      <main className="max-w-4xl mx-auto p-4 py-6 shipment-scene attendance-shell">
         <ShipmentBackdrop />
         {children}
       </main>

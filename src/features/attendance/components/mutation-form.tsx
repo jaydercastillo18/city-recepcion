@@ -1,16 +1,19 @@
 "use client";
 import { useState, useTransition } from "react";
+import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 export default function MutationForm({
   action,
   children,
   button = "Guardar",
   onSuccess,
+  submitDisabled = false,
 }: {
   action: (form: FormData) => Promise<{ error?: string; success?: boolean }>;
   children: React.ReactNode;
   button?: string;
   onSuccess?: () => void;
+  submitDisabled?: boolean;
 }) {
   const [error, setError] = useState(""),
     [success, setSuccess] = useState(false),
@@ -31,6 +34,10 @@ export default function MutationForm({
             if (result.error) setError(result.error);
             else {
               setSuccess(true);
+              toast({
+                title: "Cambio guardado",
+                description: "La operación se completó correctamente.",
+              });
               router.refresh();
               onSuccess?.();
             }
@@ -42,7 +49,11 @@ export default function MutationForm({
     >
       <fieldset disabled={pending} className="space-y-4">
         {children}
-        <button className="btn-primary w-full" type="submit">
+        <button
+          className="btn-primary w-full"
+          type="submit"
+          disabled={submitDisabled || pending}
+        >
           {pending ? "Guardando…" : button}
         </button>
       </fieldset>

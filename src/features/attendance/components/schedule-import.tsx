@@ -133,6 +133,35 @@ export default function ScheduleImport() {
   }
   return (
     <section className="card-base p-5 space-y-5">
+      <div className="attendance-wizard" aria-label="Pasos de importación">
+        {[
+          "Seleccionar archivo",
+          "Detectar fecha",
+          "Vista previa",
+          "Cambios detectados",
+          "Confirmar",
+        ].map((label, i) => (
+          <span
+            key={label}
+            className={
+              (success
+                ? 4
+                : preview
+                  ? 3
+                  : availableDates.length
+                    ? 2
+                    : file
+                      ? 1
+                      : 0) === i
+                ? "current"
+                : ""
+            }
+          >
+            <b>{i + 1}</b>
+            {label}
+          </span>
+        ))}
+      </div>
       <h2 className="text-lg font-bold">Importar horario de personal</h2>
       <p className="text-sm text-slate-400">
         Columnas NOMBRE, FUNCIÓN y fechas (6-Oct, 7-Oct…). Se aceptan 09:00,
@@ -252,7 +281,7 @@ export default function ScheduleImport() {
             onSaved={() => void load()}
           />
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
+            <table className="attendance-import-table w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="text-left text-purple-200">
                   <th className="p-2">Nombre del Excel / empleado</th>
@@ -321,12 +350,19 @@ export default function ScheduleImport() {
                           row.time?.slice(0, 5)
                         )}
                       </td>
-                      <td
-                        className={`p-2 ${old ? "text-amber-200" : "text-emerald-300"}`}
-                      >
-                        {!selection[row.key]
-                          ? "ERROR"
-                          : scheduleChange(row, old)}
+                      <td className="p-2">
+                        <span
+                          className={`attendance-badge ${!selection[row.key] || row.error ? "red" : scheduleChange(row, old) === "ACTUALIZAR" ? "amber" : "green"}`}
+                        >
+                          {!selection[row.key]
+                            ? "ERROR"
+                            : scheduleChange(row, old)}
+                        </span>
+                        {row.dayOff && (
+                          <span className="attendance-badge neutral ml-1">
+                            DESCANSO
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

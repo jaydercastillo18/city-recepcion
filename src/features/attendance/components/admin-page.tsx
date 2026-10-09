@@ -1,4 +1,5 @@
 import { getAttendanceData, attendanceSession } from "../server";
+import { limaDate } from "../domain";
 import AdminPanel from "./admin-panel";
 import type { AttendanceData, AuditLog } from "../types";
 export default async function AttendanceAdminPage({
@@ -10,12 +11,20 @@ export default async function AttendanceAdminPage({
   from?: string;
   to?: string;
 }) {
+  let dailyData: AttendanceData | undefined;
   let data: AttendanceData | null = null,
     entries: AuditLog[] = [],
     message = "";
   try {
     await attendanceSession(true);
     data = await getAttendanceData(from, to);
+    if (section === "reportes") {
+      const today = limaDate(new Date(data.serverNow));
+      dailyData =
+        data.from <= today && data.to >= today
+          ? data
+          : await getAttendanceData(today, today);
+    }
     const { client } = await attendanceSession(true);
     if (section === "personal") {
       const statuses = await client.rpc("attendance_admin_command", {
@@ -55,5 +64,12 @@ export default async function AttendanceAdminPage({
         {message}
       </div>
     );
-  return <AdminPanel section={section} data={data} audit={entries} />;
+  return (
+    <AdminPanel
+      section={section}
+      data={data}
+      audit={entries}
+      dailyData={dailyData}
+    />
+  );
 }
