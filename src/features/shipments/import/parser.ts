@@ -65,10 +65,17 @@ function findHeader(sheet: XLSX.WorkSheet): Header | null {
 
 function readQuantity(cell?: XLSX.CellObject): number | null {
   if (!cell || cell.t === 'e' || cell.v === undefined || cell.v === null || cell.v === '') return null;
-  if (typeof cell.v === 'string' && !/^\d+$/.test(cell.v.trim())) return null;
   if (typeof cell.v !== 'number' && typeof cell.v !== 'string') return null;
-  const quantity = Number(cell.v);
-  return Number.isSafeInteger(quantity) && quantity >= 0 && quantity <= MAX_BOXES ? quantity : null;
+  // PostgreSQL almacena cajas en numeric(14,2). Nunca redondear una cantidad inválida.
+  // Los valores de texto también pueden usar coma decimal (CSV).
+  const value = String(cell.v).trim();
+  if (!/^\d+(?:[.,]\d{1,2})?$/.test(value)) return null;
+  const quantity = Number(value.replace(',', '.'));
+  return Number.isFinite(quantity) && quantity >= 0 && quantity <= MAX_BOXES ? quantity : null;
+}
+
+function toCents(boxes: number): number {
+  return Math.round(boxes * 100);
 }
 
 export function parseShipmentFile(bytes: Uint8Array, fileName: string, selectedSheet?: string): ImportPreview {
@@ -179,7 +186,7 @@ export function parseShipmentFile(bytes: Uint8Array, fileName: string, selectedS
       warn('zero', 'Filas con CAJAS ENVIADAS = 0 omitidas.', row + 1);
       previewRow.validation = 'omitted'; previewRow.messages.push('No se importa: 0 cajas'); rejected.push(previewRow); continue;
     }
-    if (quantity === null) previewRow.messages.push('CAJAS ENVIADAS debe ser un entero válido mayor que 0');
+    if (quantity === null) previewRow.messages.push('CAJAS ENVIADAS debe ser un número válido mayor que 0, con hasta 2 decimales');
     if (!product.trim()) { previewRow.messages.push('Producto sin nombre'); warn('missing_name', 'Productos sin nombre: corrige el archivo antes de confirmar.', row + 1); }
     if (code.length > 120 || supplier.length > 200 || product.length > 500) previewRow.messages.push('Texto demasiado largo (código 120, proveedor 200, producto 500 caracteres)');
     if (previewRow.messages.length) {
@@ -193,7 +200,7 @@ export function parseShipmentFile(bytes: Uint8Array, fileName: string, selectedS
     const key = JSON.stringify([supplier, code, product]);
     const existing = groups.get(key);
     if (existing) {
-      existing.expected_boxes += quantity!;
+      existing.expected_boxes = (toCents(existing.expected_boxes) + toCents(quantity!)) / 100;
       existing.sourceRows.push(row + 1);
       existing.validation = 'warning';
       if (!existing.messages.includes('Filas idénticas agrupadas')) existing.messages.push('Filas idénticas agrupadas');
@@ -214,10 +221,12 @@ export function parseShipmentFile(bytes: Uint8Array, fileName: string, selectedS
     for (const row of duplicates) { row.validation = 'warning'; row.messages.push('Código compartido: producto separado'); }
   }
   const items: ImportItem[] = readyRows.map(({ supplier, code_original, product_name, expected_boxes }) => ({ supplier, code_original, product_name, expected_boxes }));
-  const totalBoxes = items.reduce((sum, item) => sum + item.expected_boxes, 0);
+  // Sumar centésimas para evitar residuos de coma flotante (ej. 0.1 + 0.2).
+  const totalCents = items.reduce((sum, item) => sum + toCents(item.expected_boxes), 0);
+  const totalBoxes = totalCents / 100;
   if (!items.length) errors.push('No hay productos con cajas enviadas mayores que 0.');
   if (items.length > MAX_IMPORT_PRODUCTS) errors.push('Se permiten como máximo 5000 productos por envío.');
-  if (!Number.isSafeInteger(totalBoxes) || totalBoxes > MAX_BOXES) errors.push('El total de cajas supera el límite del sistema.');
+  if (!Number.isSafeInteger(totalCents) || totalBoxes > MAX_BOXES) errors.push('El total de cajas supera el límite del sistema.');
   const fileHash = createHash('sha256').update(bytes).digest('hex');
   const fingerprint = createHash('sha256').update(JSON.stringify({ fileHash, sheetName, items })).digest('hex');
   return { fileName, fileHash, fingerprint, sheetName, sheets, headerRow: header.row + 1,

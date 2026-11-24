@@ -54,8 +54,8 @@ test('código original conserva formato numérico, espacios y ceros iniciales', 
   assert.equal(preview.items[1].code_original, ' kd-5238 ');
 });
 
-test('cajas 0 se omiten; fracciones, negativos, nombres ausentes y fórmulas sin valor bloquean', () => {
-  const preview = parseShipmentFile(excel([['A', 'ZERO', '', 0, 0, 0], ['A', 'BAD', 'Fracción', 1, 1.5, 0], ['A', 'NEG', 'Negativo', 1, -1, 0], ['A', 'EMPTY', '', 1, 2, 0], ['A', 'OK', 'Válido', 1, 3, 0]]), 'errores.xlsx');
+test('cajas 0 se omiten; más de dos decimales, negativos, nombres ausentes y fórmulas sin valor bloquean', () => {
+  const preview = parseShipmentFile(excel([['A', 'ZERO', '', 0, 0, 0], ['A', 'BAD', 'Más de dos decimales', 1, 1.555, 0], ['A', 'NEG', 'Negativo', 1, -1, 0], ['A', 'EMPTY', '', 1, 2, 0], ['A', 'OK', 'Válido', 1, 3, 0]]), 'errores.xlsx');
   assert.equal(preview.productCount, 1); assert.equal(preview.totalBoxes, 3);
   assert.equal(preview.rows.filter(r => r.validation === 'error').length, 3);
   assert.equal(preview.rows.filter(r => r.validation === 'omitted').length, 1);
@@ -65,6 +65,31 @@ test('cajas 0 se omiten; fracciones, negativos, nombres ausentes y fórmulas sin
   sheet.E2 = { t: 'n', f: 'SUM(A1:A5)' };
   XLSX.utils.book_append_sheet(book, sheet, 'Datos');
   assert.ok(parseShipmentFile(XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }), 'formula.xlsx').errors.length);
+});
+
+test('cajas decimales se conservan en Excel/CSV y se suman con precisión', () => {
+  const preview = parseShipmentFile(excel([
+    ['Marca', 'MEDIA', 'Media caja', 0, 0.5, 0],
+    ['Marca', 'MEDIA', 'Media caja', 0, 0.2, 0],
+    ['Marca', 'OTRO', 'Fracción', 0, 0.3, 0],
+  ]), 'medias.xlsx');
+  assert.deepEqual(preview.errors, []);
+  assert.equal(preview.productCount, 2);
+  assert.equal(preview.items[0].expected_boxes, 0.7);
+  assert.equal(preview.totalBoxes, 1);
+
+  const csv = '\uFEFFproveedor/marca;código;producto;cajas enviadas\r\nMarca;0000123;Media caja;0,5\r\nMarca;0000124;Caja y cuarto;1.25';
+  const parsedCsv = parseShipmentFile(Buffer.from(csv), 'medias.csv');
+  assert.deepEqual(parsedCsv.errors, []);
+  assert.deepEqual(parsedCsv.items.map(item => item.expected_boxes), [0.5, 1.25]);
+  assert.equal(parsedCsv.totalBoxes, 1.75);
+
+  const invalid = parseShipmentFile(excel([
+    ['A', 'DEC3', 'Tres decimales', 0, 0.125, 0],
+    ['A', 'NEG', 'Negativo', 0, -0.5, 0],
+  ]), 'decimales-invalidos.xlsx');
+  assert.equal(invalid.rows.filter(row => row.validation === 'error').length, 2);
+  assert.equal(invalid.errors.length, 3); // Dos filas inválidas y ningún producto importable.
 });
 
 test('CSV preserva códigos de texto y XLS real se lee', () => {
