@@ -97,7 +97,7 @@ function ImportSession({ onClose }: { onClose: () => void }) {
             <input aria-label="Archivo Excel o CSV" type="file" accept=".xlsx,.xls,.csv" disabled={busy}
               className="w-full text-sm text-slate-300 file:mr-3 file:min-h-11 file:rounded-lg file:border-0 file:px-3 file:bg-purple-700 file:text-white"
               onChange={event => { const selected = event.target.files?.[0] ?? null; setFile(selected); setPreview(null); setError(''); if (selected) void readPreview(selected); }} />
-            <p className="text-xs text-slate-400">.xlsx, .xls, .csv · Hasta 5 MB · Se usa CAJAS ENVIADAS · No se acepta PDF</p>
+            <p className="text-xs text-slate-400">.xlsx, .xls, .csv · Hasta 5 MB · CAJAS ENVIADAS acepta decimales (ej. 0.5) · No se acepta PDF</p>
           </label>
           {busy && <p role="status" className="flex items-center gap-2 text-fuchsia-200"><Loader2 className="w-5 h-5 animate-spin" />{preview ? 'Importando envío…' : 'Leyendo archivo…'}</p>}
           {preview && <>
