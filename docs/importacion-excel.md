@@ -33,7 +33,7 @@ Los encabezados se convierten a mayúsculas, se eliminan tildes y se normalizan 
 | Producto requerido | PRODUCTO, NOMBRE DEL PRODUCTO, DESCRIPCIÓN |
 | Cantidad requerida | CAJAS ENVIADAS, CJS ENVIADAS |
 
-CAJAS DISTRIBUIDAS, PENDIENTES, RECIBIDAS y NO LLEGÓ no determinan la cantidad esperada. Se omiten filas con 0 cajas y se bloquean cantidades negativas, fraccionarias, ausentes o inválidas. No se aceptan columnas requeridas ambiguas, ni productos sin nombre con cajas positivas. Las fórmulas usan el valor que Excel guardó: guarda/recalcula el libro primero y revisa la vista previa.
+CAJAS DISTRIBUIDAS, PENDIENTES, RECIBIDAS y NO LLEGÓ no determinan la cantidad esperada. Se omiten filas con 0 cajas; se aceptan cantidades positivas de hasta dos decimales (por ejemplo 0.5 o 1.25), de acuerdo con `numeric(14,2)` en PostgreSQL. Se bloquean cantidades negativas, con más de dos decimales, ausentes o inválidas. No se aceptan columnas requeridas ambiguas, ni productos sin nombre con cajas positivas. Las fórmulas usan el valor que Excel guardó: guarda/recalcula el libro primero y revisa la vista previa.
 
 El código original conserva el texto visible, incluido un formato numérico como `000123`. Si Excel ya eliminó los ceros y no conserva un formato que los muestre, no pueden recuperarse; configura la columna como texto en origen. `code_normalized` elimina separadores y convierte a mayúsculas para buscar.
 
